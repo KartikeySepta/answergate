@@ -28,13 +28,16 @@ COLLECTION_NAME = "transcript_chunks"
 VECTOR_SIZE = 384   # bge-small-en-v1.5 output dimension — update if you change EMBEDDING_MODEL
 
 _client = None
+_client_thread_id = None   # the thread that opened the local store (see _close_client)
 
 
 def get_client(path: str = "data/qdrant_db"):
     """Local on-disk Qdrant — no server process needed. Reused across calls."""
-    global _client
+    global _client, _client_thread_id
     if _client is None:
+        import threading
         _client = QdrantClient(path=path)
+        _client_thread_id = threading.get_ident()
         if not _client.collection_exists(COLLECTION_NAME):
             _client.create_collection(
                 collection_name=COLLECTION_NAME,
@@ -49,14 +52,44 @@ def get_client(path: str = "data/qdrant_db"):
 
 
 def _close_client():
-    global _client
+    """
+    Close the local store, but only from the thread that opened it.
+
+    Qdrant's local mode is backed by SQLite, and SQLite connections may only be
+    used on their creating thread. Once the API runs the pipeline on a background
+    worker thread, the atexit handler fires on the MAIN thread and closing there
+    raises 'SQLite objects created in a thread can only be used in that same
+    thread'. So a cross-thread call drops the reference without closing and
+    leaves the real close to the owning thread (see close_client_for_thread).
+    """
+    global _client, _client_thread_id
+    import threading
+
+    if _client is None:
+        return
+    if _client_thread_id is not None and threading.get_ident() != _client_thread_id:
+        # Not ours to close. Detach so nothing else tries.
+        _client = None
+        _client_thread_id = None
+        return
     try:
-        if _client is not None:
-            _client.close()
+        _client.close()
     except Exception:
         pass
     finally:
         _client = None
+        _client_thread_id = None
+
+
+def close_client_for_thread():
+    """
+    Public: release the local store from the current thread.
+
+    The job worker calls this when a pipeline finishes, which both avoids the
+    cross-thread teardown error and frees the Qdrant writer lock while idle, so
+    a CLI run in another process is not blocked by a long-lived API server.
+    """
+    _close_client()
 
 
 def upsert_chunks(chunks: list[dict], client: QdrantClient = None):

@@ -23,6 +23,11 @@ scraper/*.mp3
 rag/data/workspaces/
 rag/data/raw/
 rag/data/qdrant_db/
+rag/data/*.json
+
+# Data / Jobs database
+data/
+
 
 # macOS
 .DS_Store

@@ -545,6 +545,19 @@ def cmd_add(args):
     import tempfile
     import os
 
+    from core.security import validate_workspace_id, validate_youtube_url
+
+    # Validate first: catches a file path passed where a URL belongs, and blocks
+    # workspace ids that would escape the workspaces directory.
+    try:
+        url = validate_youtube_url(args.url)
+        workspace_id = validate_workspace_id(args.workspace_id)
+    except ValueError as e:
+        print(f"❌ {e}")
+        if not str(e).startswith("Invalid workspace_id"):
+            print("   Tip: to process a file of URLs use → python3 cli.py batch <file> <workspace>")
+        return
+
     scraper = Path(__file__).resolve().parent.parent / "scraper" / "youtube.py"
     if not scraper.exists():
         print(f"ERROR: scraper not found at {scraper}")
@@ -554,20 +567,20 @@ def cmd_add(args):
     tmp.close()
 
     try:
-        print(f"📡 Scraping: {args.url}")
+        print(f"📡 Scraping: {url}")
         subprocess.run(
-            ["python3", str(scraper), args.url, "--engine", args.engine, "--output", tmp.name],
+            ["python3", str(scraper), url, "--engine", args.engine, "--output", tmp.name],
             check=True,
         )
 
-        print(f"\n⚙️ Running pipeline for workspace '{args.workspace_id}'...")
+        print(f"\n⚙️ Running pipeline for workspace '{workspace_id}'...")
         # Re-use the existing cmd functions by building Namespace objects
         from argparse import Namespace
 
-        ns_ingest = Namespace(raw_path=tmp.name, workspace_id=args.workspace_id)
+        ns_ingest = Namespace(raw_path=tmp.name, workspace_id=workspace_id)
         cmd_ingest(ns_ingest)
 
-        ns = Namespace(workspace_id=args.workspace_id)
+        ns = Namespace(workspace_id=workspace_id)
         print("\n📐 Indexing...")
         cmd_index(ns)
         print("\n🧠 Extracting claims...")
@@ -582,9 +595,9 @@ def cmd_add(args):
         print("\n📄 Generating report...")
         cmd_report(ns)
 
-        print(f"\n✅ Done! Your workspace '{args.workspace_id}' is ready.")
-        print(f"   → Read the brief: cat data/workspaces/{args.workspace_id}/report.md")
-        print(f"   → Chat with it:   python3 cli.py talk {args.workspace_id}")
+        print(f"\n✅ Done! Your workspace '{workspace_id}' is ready.")
+        print(f"   → Read the brief: cat data/workspaces/{workspace_id}/report.md")
+        print(f"   → Chat with it:   python3 cli.py talk {workspace_id}")
     finally:
         if os.path.exists(tmp.name):
             os.unlink(tmp.name)

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 from dotenv import load_dotenv
 from typing import Any
 
@@ -8,6 +9,10 @@ from yt_dlp import YoutubeDL
 
 
 from pathlib import Path as _Path
+
+# Make sibling modules (security.py) importable no matter the working directory.
+sys.path.insert(0, str(_Path(__file__).resolve().parent))
+
 load_dotenv(_Path(__file__).resolve().parent.parent / ".env")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
@@ -142,6 +147,11 @@ def process_video(
 ) -> dict[str, Any]:
     """Run the complete YouTube metadata and transcription workflow."""
     local_audio_file = None
+
+    # Validate up front so a stray file path or non-YouTube link fails with a
+    # clear message instead of a yt-dlp stack trace.
+    from security import validate_youtube_url
+    url = validate_youtube_url(url)
 
     try:
         local_audio_file, video_metadata = extract_audio_and_metadata(url)

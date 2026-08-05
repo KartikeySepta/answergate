@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/*
+  Design language: "research notebook"
+
+  The product turns video into cited evidence, so the UI borrows from printed
+  scholarship rather than dashboards:
+
+  · warm near-black (a dark page, not a black screen) so long reading is easy
+  · ochre accent used like a highlighter pen — reserved for evidence and the
+    one primary action on a screen, never decoration
+  · strict typographic split: mono + uppercase tracking for metadata and
+    identifiers, sans for anything a person actually reads
+  · hairline rules and a left gutter, like a manuscript margin
+*/
+
+@theme {
+  /* Page */
+  --color-background: hsl(30 6% 7%);
+  --color-foreground: hsl(35 15% 88%);
+
+  /* Raised surfaces */
+  --color-card: hsl(30 6% 9.5%);
+  --color-card-foreground: hsl(35 15% 88%);
+  --color-popover: hsl(30 6% 12%);
+  --color-popover-foreground: hsl(35 15% 90%);
+
+  /* Highlighter — the single accent */
+  --color-primary: hsl(35 85% 58%);
+  --color-primary-foreground: hsl(30 10% 8%);
+
+  --color-secondary: hsl(30 5% 14%);
+  --color-secondary-foreground: hsl(35 12% 82%);
+  --color-muted: hsl(30 5% 13%);
+  --color-muted-foreground: hsl(35 8% 52%);
+  --color-accent: hsl(30 5% 15%);
+  --color-accent-foreground: hsl(35 15% 90%);
+
+  /* Semantic — status only */
+  --color-destructive: hsl(2 65% 52%);
+  --color-destructive-foreground: hsl(35 20% 95%);
+  --color-success: hsl(150 45% 45%);
+  --color-success-foreground: hsl(30 10% 8%);
+  --color-warning: hsl(35 85% 58%);
+  --color-warning-foreground: hsl(30 10% 8%);
+
+  --color-border: hsl(30 5% 16%);
+  --color-input: hsl(30 5% 18%);
+  --color-ring: hsl(35 85% 58%);
+
+  --radius: 0.375rem;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numerals line up in tables and index markers */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(30 5% 20%);
+    border: 3px solid var(--color-background);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(30 5% 28%);
+  }
+
+  ::selection {
+    background: hsl(35 85% 58% / 0.25);
+    color: hsl(35 20% 95%);
+  }
+
+  /* Focus: a highlighter underline rather than a ring, matching the metaphor */
+  :focus-visible {
+    outline: 2px solid hsl(35 85% 58% / 0.6);
+    outline-offset: 2px;
+  }
+}
