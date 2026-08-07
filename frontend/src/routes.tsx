@@ -1,22 +1,24 @@
-import { createBrowserRouter } from "react-router-dom";
-import { Layout } from "./components/Layout";
-import { AddVideoPage } from "./pages/AddVideoPage";
-import { JobMonitorPage } from "./pages/JobMonitorPage";
-import { JobHistoryPage } from "./pages/JobHistoryPage";
-import { WorkspaceListPage } from "./pages/WorkspaceListPage";
-import { WorkspaceDetailPage } from "./pages/WorkspaceDetailPage";
-import { SettingsPage } from "./pages/SettingsPage";
+import { createBrowserRouter } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { DashboardPage } from './pages/DashboardPage';
+import { NewResearchPage } from './pages/NewResearchPage';
+import { ProcessingPage } from './pages/ProcessingPage';
+import { ProcessingCentrePage } from './pages/ProcessingCentrePage';
+import { WorkspaceDetailPage } from './pages/WorkspaceDetailPage';
+import { WorkspaceListPage } from './pages/WorkspaceListPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { path: "/", element: <AddVideoPage /> },
-      { path: "/jobs", element: <JobHistoryPage /> },
-      { path: "/jobs/:jobId", element: <JobMonitorPage /> },
-      { path: "/workspaces", element: <WorkspaceListPage /> },
-      { path: "/workspaces/:id", element: <WorkspaceDetailPage /> },
-      { path: "/settings", element: <SettingsPage /> },
+      { path: '/', element: <DashboardPage /> },
+      { path: '/research', element: <WorkspaceListPage /> },
+      { path: '/research/new', element: <NewResearchPage /> },
+      { path: '/research/:id', element: <WorkspaceDetailPage /> },
+      { path: '/processing', element: <ProcessingCentrePage /> },
+      { path: '/processing/:jobId', element: <ProcessingPage /> },
+      { path: '/settings', element: <SettingsPage /> },
     ],
   },
 ]);

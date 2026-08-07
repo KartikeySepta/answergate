@@ -1,5 +1,7 @@
-export { AddVideoPage } from "./AddVideoPage";
-export { JobMonitorPage } from "./JobMonitorPage";
-export { JobHistoryPage } from "./JobHistoryPage";
-export { WorkspaceListPage } from "./WorkspaceListPage";
-export { WorkspaceDetailPage } from "./WorkspaceDetailPage";
+export { DashboardPage } from './DashboardPage';
+export { NewResearchPage } from './NewResearchPage';
+export { ProcessingPage } from './ProcessingPage';
+export { ProcessingCentrePage } from './ProcessingCentrePage';
+export { WorkspaceDetailPage } from './WorkspaceDetailPage';
+export { WorkspaceListPage } from './WorkspaceListPage';
+export { SettingsPage } from './SettingsPage';

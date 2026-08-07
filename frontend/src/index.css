@@ -1,57 +1,66 @@
 @import "tailwindcss";
 
 /*
-  Design language: "research notebook"
+  Design language: "AI Research Desk"
 
-  The product turns video into cited evidence, so the UI borrows from printed
-  scholarship rather than dashboards:
+  Editorial, light, evidence-first.
+  Inspired by Perplexity's research feel, Notion's readability,
+  and Linear's interface precision.
 
-  · warm near-black (a dark page, not a black screen) so long reading is easy
-  · ochre accent used like a highlighter pen — reserved for evidence and the
-    one primary action on a screen, never decoration
-  · strict typographic split: mono + uppercase tracking for metadata and
-    identifiers, sans for anything a person actually reads
-  · hairline rules and a left gutter, like a manuscript margin
+  · Warm white background — reads like a research paper
+  · Deep cobalt primary — confidence and trust
+  · Emerald for verified evidence
+  · Coral for contradictions
+  · Amber for warnings / different contexts
+  · Navy text instead of pure black — easier on the eyes
 */
 
 @theme {
   /* Page */
-  --color-background: hsl(30 6% 7%);
-  --color-foreground: hsl(35 15% 88%);
+  --color-background: hsl(40 33% 98%);
+  --color-foreground: hsl(222 47% 11%);
 
   /* Raised surfaces */
-  --color-card: hsl(30 6% 9.5%);
-  --color-card-foreground: hsl(35 15% 88%);
-  --color-popover: hsl(30 6% 12%);
-  --color-popover-foreground: hsl(35 15% 90%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222 47% 11%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222 47% 11%);
 
-  /* Highlighter — the single accent */
-  --color-primary: hsl(35 85% 58%);
-  --color-primary-foreground: hsl(30 10% 8%);
+  /* Primary — deep cobalt */
+  --color-primary: hsl(221 83% 53%);
+  --color-primary-foreground: hsl(0 0% 100%);
 
-  --color-secondary: hsl(30 5% 14%);
-  --color-secondary-foreground: hsl(35 12% 82%);
-  --color-muted: hsl(30 5% 13%);
-  --color-muted-foreground: hsl(35 8% 52%);
-  --color-accent: hsl(30 5% 15%);
-  --color-accent-foreground: hsl(35 15% 90%);
+  /* Secondary */
+  --color-secondary: hsl(220 14% 96%);
+  --color-secondary-foreground: hsl(222 47% 11%);
+  --color-muted: hsl(220 14% 96%);
+  --color-muted-foreground: hsl(220 9% 46%);
+  --color-accent: hsl(220 14% 96%);
+  --color-accent-foreground: hsl(222 47% 11%);
 
-  /* Semantic — status only */
-  --color-destructive: hsl(2 65% 52%);
-  --color-destructive-foreground: hsl(35 20% 95%);
-  --color-success: hsl(150 45% 45%);
-  --color-success-foreground: hsl(30 10% 8%);
-  --color-warning: hsl(35 85% 58%);
-  --color-warning-foreground: hsl(30 10% 8%);
+  /* Semantic */
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-success: hsl(160 60% 40%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-foreground: hsl(222 47% 11%);
 
-  --color-border: hsl(30 5% 16%);
-  --color-input: hsl(30 5% 18%);
-  --color-ring: hsl(35 85% 58%);
+  /* Evidence relationship colors */
+  --color-agreement: hsl(160 60% 40%);
+  --color-contradiction: hsl(0 72% 51%);
+  --color-partial: hsl(221 83% 53%);
+  --color-different-context: hsl(38 92% 50%);
 
-  --radius: 0.375rem;
+  --color-border: hsl(220 13% 91%);
+  --color-input: hsl(220 13% 91%);
+  --color-ring: hsl(221 83% 53%);
+
+  --radius: 0.5rem;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-serif: "Georgia", "Times New Roman", serif;
 }
 
 @layer base {
@@ -66,35 +75,33 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Numerals line up in tables and index markers */
   .tabular {
     font-variant-numeric: tabular-nums;
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(30 5% 20%);
-    border: 3px solid var(--color-background);
+    background: hsl(220 13% 82%);
+    border: 2px solid var(--color-background);
     border-radius: 6px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(30 5% 28%);
+    background: hsl(220 13% 70%);
   }
 
   ::selection {
-    background: hsl(35 85% 58% / 0.25);
-    color: hsl(35 20% 95%);
+    background: hsl(221 83% 53% / 0.15);
+    color: hsl(222 47% 11%);
   }
 
-  /* Focus: a highlighter underline rather than a ring, matching the metaphor */
   :focus-visible {
-    outline: 2px solid hsl(35 85% 58% / 0.6);
+    outline: 2px solid hsl(221 83% 53% / 0.5);
     outline-offset: 2px;
   }
 }

@@ -20,13 +20,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster
-        theme="dark"
+        theme="light"
         position="bottom-right"
         toastOptions={{
           style: {
-            background: "hsl(30 6% 12%)",
-            border: "1px solid hsl(30 5% 18%)",
-            color: "hsl(35 15% 88%)",
+            background: "hsl(0 0% 100%)",
+            border: "1px solid hsl(220 13% 91%)",
+            color: "hsl(222 47% 11%)",
             fontSize: "13px",
           },
         }}

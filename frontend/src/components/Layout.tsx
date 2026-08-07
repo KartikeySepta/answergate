@@ -1,26 +1,26 @@
+import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  FlaskConical,
+  Loader2,
+  Settings,
+  Menu,
+  X,
+} from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
 import { cn } from "@/lib/utils";
-import { MicroLabel } from "@/components/ui/primitives";
-
-/*
- * Shell: a fixed left rail, content on a warm dark page.
- *
- * The rail is text-first and numbered rather than icon-led. Icons would imply
- * these are tools; the numbers imply a sequence, which is what this actually is
- * — you add sources, watch them process, then read the result.
- */
 
 const nav = [
-  { to: "/", label: "Add source", step: 1 },
-  { to: "/jobs", label: "Processing", step: 2 },
-  { to: "/workspaces", label: "Research", step: 3 },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/research", label: "Research", icon: FlaskConical },
+  { to: "/processing", label: "Processing", icon: Loader2 },
 ] as const;
 
 export function Layout() {
   const { pathname } = useLocation();
-  // Live queue count in the rail — the pipeline is serial, so knowing something
-  // is running elsewhere is the difference between "slow" and "waiting its turn".
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const { data: jobsData } = useJobs();
   const running = jobsData?.jobs.filter(
     (j) => j.status === "running" || j.status === "queued"
@@ -31,21 +31,23 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[212px] flex-col border-r border-border bg-card md:flex">
-        {/* Wordmark */}
-        <div className="px-5 pb-6 pt-6">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col border-r border-border bg-card lg:flex">
+        {/* Brand */}
+        <div className="px-6 py-6">
           <Link to="/" className="block">
-            <div className="font-mono text-[13px] font-medium tracking-tight text-foreground">
-              evidence
-              <span className="text-primary">/</span>
-              base
-            </div>
-            <MicroLabel className="mt-1 block">cited video research</MicroLabel>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Research Desk
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              AI-powered video research
+            </p>
           </Link>
         </div>
 
-        <nav className="flex-1 px-2">
-          {nav.map(({ to, label, step }) => {
+        {/* Navigation */}
+        <nav className="flex-1 space-y-1 px-3">
+          {nav.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
             return (
               <Link
@@ -53,38 +55,16 @@ export function Layout() {
                 to={to}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group relative flex items-baseline gap-3 rounded-md px-3 py-2.5 transition-colors",
-                  active ? "bg-accent" : "hover:bg-accent/40"
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                {/* Active marker: a highlighter tick in the margin */}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full transition-colors",
-                    active ? "bg-primary" : "bg-transparent"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "tabular font-mono text-[10px]",
-                    active ? "text-primary" : "text-muted-foreground/50"
-                  )}
-                >
-                  {String(step).padStart(2, "0")}
-                </span>
-                <span
-                  className={cn(
-                    "text-[13px] leading-none",
-                    active
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground group-hover:text-foreground"
-                  )}
-                >
-                  {label}
-                </span>
-                {to === "/jobs" && running ? (
-                  <span className="tabular ml-auto font-mono text-[10px] text-primary">
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+                {to === "/processing" && running ? (
+                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
                     {running}
                   </span>
                 ) : null}
@@ -93,56 +73,91 @@ export function Layout() {
           })}
         </nav>
 
-        <div className="space-y-3 border-t border-border px-5 py-4">
+        {/* Footer */}
+        <div className="border-t border-border px-3 py-4">
           <Link
             to="/settings"
             className={cn(
-              "block text-[12px] transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               pathname.startsWith("/settings")
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
-            Settings
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
           </Link>
-          <p className="font-mono text-[10px] text-muted-foreground/60">
-            local · single worker
-          </p>
         </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex items-center gap-4 border-b border-border bg-card px-4 py-3 md:hidden">
-        <Link to="/" className="font-mono text-[13px] font-medium">
-          evidence<span className="text-primary">/</span>base
+      {/* Mobile header */}
+      <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm lg:hidden">
+        <Link to="/" className="text-base font-semibold text-foreground">
+          Research Desk
         </Link>
-        <nav className="ml-auto flex items-center gap-3">
-          {nav.map(({ to, step }) => (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                "tabular font-mono text-[11px]",
-                isActive(to) ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              {String(step).padStart(2, "0")}
-            </Link>
-          ))}
-          <Link
-            to="/settings"
-            className={cn(
-              "font-mono text-[11px]",
-              pathname.startsWith("/settings") ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            ··
-          </Link>
-        </nav>
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Toggle navigation"
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </div>
 
-      <main className="md:ml-[212px]">
-        <div className="mx-auto max-w-3xl px-5 py-10 md:px-10">
+      {/* Mobile nav overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div
+            className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <nav className="absolute right-0 top-[57px] w-64 border-l border-border bg-card p-4 shadow-lg">
+            <div className="space-y-1">
+              {nav.map(({ to, label, icon: Icon }) => {
+                const active = isActive(to);
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                      active
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                    {to === "/processing" && running ? (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                        {running}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+              <Link
+                to="/settings"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  pathname.startsWith("/settings")
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </Link>
+            </div>
+          </nav>
+        </div>
+      )}
+
+      {/* Main content */}
+      <main className="lg:ml-[240px]">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </main>
