@@ -1,5 +1,5 @@
 """
-Video RAG Tool — FastAPI endpoints.
+Video RAG Tool — FastAPI endpoints .
 
 Run:  uvicorn api:app --reload --port 8000
 Docs: http://localhost:8000/docs (auto-generated Swagger UI)
