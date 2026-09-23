@@ -398,9 +398,15 @@ def render_clips(result: dict) -> str:
         lines.append("")
 
     if not clips:
-        lines.append(f'No clip in this workspace answers: "{result["question"]}"')
-        if not result["errors"]:
+        # "we checked and found nothing" and "we could not check" are different facts.
+        # Reporting the second as the first is how a tool teaches people not to trust it.
+        if result.get("gate_ran", True):
+            lines.append(f'No clip in this workspace answers: "{result["question"]}"')
             lines.append("The topic may be mentioned without being answered.")
+        else:
+            lines.append(f'COULD NOT DETERMINE an answer for: "{result["question"]}"')
+            lines.append("The answer gate did not run, so nothing here has been checked. "
+                         "This is not the same as 'no answer exists' — retry.")
         return "\n".join(lines)
 
     lines.append(f'{len(clips)} clip(s) answer: "{result["question"]}"')

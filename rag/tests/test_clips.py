@@ -594,3 +594,14 @@ def test_renderer_omits_the_skip_line_when_the_gate_failed():
     out = render_clips(result)
     assert "you can skip" not in out
     assert "ERRORS" in out
+
+
+def test_renderer_distinguishes_could_not_check_from_found_nothing():
+    """These are different facts. Reporting the second as the first destroys trust."""
+    checked = {**RESULT, "clips": [], "errors": [], "gate_ran": True}
+    not_checked = {**RESULT, "clips": [], "errors": ["gate failed: boom"], "gate_ran": False}
+
+    assert "no clip in this workspace answers" in render_clips(checked).lower()
+    out = render_clips(not_checked).lower()
+    assert "could not determine" in out
+    assert "no clip in this workspace answers" not in out
