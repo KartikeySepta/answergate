@@ -77,6 +77,18 @@ def _strip_fences(raw: str) -> str:
     return raw.strip()
 
 
+def _load_json_or_raise(raw: str, what: str) -> dict:
+    """Both parsers need the same thing: fenced JSON in, dict out, ValueError on garbage.
+
+    ValueError here always means INFRASTRUCTURE failure (a model returned something
+    unusable), never a verdict. Callers must keep that distinction — see find_clips.
+    """
+    try:
+        return json.loads(_strip_fences(raw))
+    except Exception as e:
+        raise ValueError(f"unparseable {what} reply: {e}")
+
+
 def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict], list[dict]]:
     """Validate the gate's reply against the chunks we actually sent.
 
@@ -87,10 +99,7 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
     Raises ValueError if the reply is not parseable JSON at all. That is an infrastructure
     failure, not a verdict, and the caller must treat it as such.
     """
-    try:
-        parsed = json.loads(_strip_fences(raw))
-    except Exception as e:
-        raise ValueError(f"unparseable answer-gate reply: {e}")
+    parsed = _load_json_or_raise(raw, "answer-gate")
 
     text_by_id = {c["chunk_id"]: c["text"] for c in chunks}
     verdicts: list[dict] = []
@@ -229,10 +238,7 @@ def parse_conflict_response(raw: str, clip_count: int) -> list[tuple[int, int]]:
 
     Raises ValueError on unparseable JSON — an infrastructure failure, not a verdict.
     """
-    try:
-        parsed = json.loads(_strip_fences(raw))
-    except Exception as e:
-        raise ValueError(f"unparseable conflict reply: {e}")
+    parsed = _load_json_or_raise(raw, "conflict")
 
     seen: set[tuple[int, int]] = set()
     for pair in parsed.get("conflicts", []):
@@ -258,11 +264,23 @@ def _default_retrieve(question: str, workspace_id: str) -> list[dict]:
     without torch or qdrant — see this module's docstring.
     """
     from core.config import RERANK_KEEP_TOP, VECTOR_TOP_K
+    from retrieval.bm25 import load_workspace_chunks
     from retrieval.hybrid import hybrid_search
     from retrieval.reranker import rerank
 
     fused = hybrid_search(question, workspace_id=workspace_id, top_k=VECTOR_TOP_K)
-    return rerank(question, fused, top_k=RERANK_KEEP_TOP)
+    reranked = rerank(question, fused, top_k=RERANK_KEEP_TOP)
+
+    # is_estimated is NOT in the Qdrant payload (see vector_store.py), but BM25 loads
+    # chunks.json and carries it. RRF keeps whichever copy it saw first, so without this
+    # join the field's presence depends on which retriever surfaced the chunk — making the
+    # `~` marker and the ranking tie-break fire nondeterministically. Joining here fixes it
+    # for ALREADY-INDEXED workspaces too, which adding it to the payload would not.
+    estimated_by_id = {c["chunk_id"]: bool(c.get("is_estimated"))
+                       for c in load_workspace_chunks(workspace_id)}
+    for c in reranked:
+        c["is_estimated"] = estimated_by_id.get(c["chunk_id"], c.get("is_estimated", False))
+    return reranked
 
 
 def _default_generate(prompt: str, task: str | None = None) -> str:
@@ -433,3 +451,54 @@ def render_clips(result: dict) -> str:
         lines.append(f'({len(result["rejections"])} model output(s) rejected by validation)')
 
     return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    # Offline self-tests, matching the convention in rag/README.md "Offline self-tests".
+    # No network, no models, no API key — every guard below is a pure function.
+    #
+    #   python3 retrieval/clips.py --test-gate
+    if len(sys.argv) > 1 and sys.argv[1] == "--test-gate":
+        chunks = [{"chunk_id": "c1", "video_id": "v1", "text": "Creatine retention is intramuscular."}]
+
+        # A span the chunk really contains survives as "answers".
+        v, r = parse_answer_gate_response(
+            json.dumps({"verdicts": [
+                {"chunk_id": "c1", "verdict": "answers", "span": "retention is intramuscular"}]}),
+            chunks)
+        assert v[0]["verdict"] == "answers" and not r, (v, r)
+
+        # A span the chunk does NOT contain is refused, not shown.
+        v, r = parse_answer_gate_response(
+            json.dumps({"verdicts": [
+                {"chunk_id": "c1", "verdict": "answers", "span": "creatine is dangerous"}]}),
+            chunks)
+        assert v[0]["verdict"] == "mentions" and r, (v, r)
+
+        # An invented chunk_id never reaches the caller.
+        v, r = parse_answer_gate_response(
+            json.dumps({"verdicts": [
+                {"chunk_id": "nope", "verdict": "answers", "span": "x"}]}),
+            chunks)
+        assert v == [] and r, (v, r)
+
+        # Conflict indices outside the clip list are discarded.
+        assert parse_conflict_response('{"conflicts": [[1, 2]]}', 2) == [(1, 2)]
+        assert parse_conflict_response('{"conflicts": [[1, 9]]}', 2) == []
+
+        # Links seek early and clamp at zero.
+        assert build_watch_url("abc", 1170.0) == "https://youtu.be/abc?t=1167"
+        assert build_watch_url("abc", 1.0) == "https://youtu.be/abc?t=0"
+
+        # Unparseable output is an INFRA failure (ValueError), never a quiet verdict.
+        try:
+            parse_answer_gate_response("not json", chunks)
+            raise AssertionError("expected ValueError on unparseable output")
+        except ValueError:
+            pass
+
+        print("gate guards OK (verbatim, invented ids, conflict indices, links, infra errors)")
+        sys.exit(0)
+
+    print(__doc__)
+    print("Run the offline guards with:  python3 retrieval/clips.py --test-gate")

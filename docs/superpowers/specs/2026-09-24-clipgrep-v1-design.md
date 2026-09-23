@@ -250,7 +250,7 @@ Output shape (also the demo's data contract):
    {"rank": 1, "chunk_id": "vid1_c14", "video_id": "vid1",
     "video_title": "...", "channel": "@Nippard", "upload_date": "20260411",
     "start_seconds": 1170.0, "end_seconds": 1218.0, "is_estimated": true,
-    "verbatim": "water retention is intramuscular, not subcutaneous",
+    "span": "water retention is intramuscular, not subcutaneous",
     "watch_url": "https://youtu.be/vid1?t=1167",
     "conflicts_with": [2]}],
  "skipped": {"video_count": 9, "total_seconds": 13860,

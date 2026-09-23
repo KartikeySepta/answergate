@@ -90,5 +90,9 @@ python3 knowledge/claim_extractor.py            # evidence-validation demo
 python3 chat/engine.py --test-citation-verifier # citation verifier
 python3 knowledge/synthesizer.py --test-relationship-parser
 python3 evals/evaluate.py --test-scoring
+python3 evals/evaluate_gate.py --test-scoring   # answer-gate scoring
+python3 retrieval/clips.py --test-gate          # answer-gate guards
 python3 cli.py --test-dispatch
 ```
+
+The pytest suite is offline too (`python3 -m pytest rag/tests/ -v`) and runs in CI.
