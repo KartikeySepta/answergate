@@ -18,6 +18,11 @@ right. It reads videos NotebookLM can't, on hardware you own, without limits.
 
 ## Find the clips that *answer* you, not the ones that mention your topic
 
+**[See it running, no install](https://KartikeySepta.github.io/YouTube-ai-workspace/demo/)** — real
+output over two real videos, with every timestamp playable. Including a question the corpus
+cannot answer, where it returns nothing rather than the nearest-sounding passage.
+
+
 ```bash
 python3 cli.py clips my_research "does creatine cause bloating?"
 ```
@@ -88,6 +93,18 @@ LLM_BACKEND=ollama python3 evals/evaluate_gate.py map
 
 You can also split routing — keep bulk claim extraction local and send only the gate to a
 cloud model — with `EXTRACTION_BACKEND=ollama GATE_BACKEND=gemini`.
+
+## How much of a video is worth watching
+
+```bash
+python3 cli.py density my_research     # no question needed
+```
+
+Reports claims per minute per video, derived from counted data rather than an LLM's
+opinion. **Measured caveat:** the claim-bearing *percentage* saturates — across 7 real
+videos from 6 creators it sat at 87-100%, because chunks are ~180 words and nearly every
+chunk yields a claim, so it tracks chunk size rather than substance. It ships as a rough
+diagnostic and says so in its own output; it is not a way to rank videos.
 
 ## What this does not do
 
