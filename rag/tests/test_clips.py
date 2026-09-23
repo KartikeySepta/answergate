@@ -513,3 +513,84 @@ def test_render_surfaces_errors_distinctly_from_no_answers():
     failed = {**RESULT, "clips": [], "errors": ["answer gate failed: boom"]}
     out = render_clips(failed).lower()
     assert "error" in out or "failed" in out
+
+
+# ─── REGRESSION GUARDS (defects found reviewing the first implementation) ──────
+
+def test_duplicate_verdict_for_same_chunk_keeps_the_first_and_rejects_the_rest():
+    """A model returning one chunk twice with conflicting verdicts is not deciding.
+
+    Keeping both let the later verdict silently overwrite the earlier one via span_by_id.
+    """
+    chunks = [{"chunk_id": "c1", "video_id": "v", "text": "alpha beta gamma"}]
+    raw = json.dumps({"verdicts": [
+        {"chunk_id": "c1", "verdict": "answers", "span": "alpha beta"},
+        {"chunk_id": "c1", "verdict": "unrelated", "span": ""},
+    ]})
+    verdicts, rejections = parse_answer_gate_response(raw, chunks)
+    assert len(verdicts) == 1
+    assert verdicts[0]["verdict"] == "answers"
+    assert any("duplicate" in r["reason"] for r in rejections)
+
+
+def test_clip_with_missing_timestamps_does_not_crash_the_renderer():
+    """format_timestamp does int(seconds); a None start_seconds used to raise TypeError."""
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: [
+            {"chunk_id": "c1", "video_id": "v1", "video_title": "T", "channel": "@A",
+             "rerank_score": 0.9, "text": "alpha beta gamma"}],   # no start/end at all
+        generate_fn=_fake_generate(json.dumps({"verdicts": [
+            {"chunk_id": "c1", "verdict": "answers", "span": "alpha beta"}]})),
+        load_videos_fn=lambda w: [{"video_id": "v1", "duration_seconds": 60}],
+    )
+    assert result["clips"][0]["start_seconds"] == 0.0
+    render_clips(result)   # must not raise
+
+
+def test_gate_failure_does_not_claim_videos_are_skippable():
+    """"4h you can skip" after a rate limit is worse than no answer at all.
+
+    The skip report asserts "these videos contain nothing that answers you." If the gate
+    never ran, that has not been checked and must not be claimed.
+    """
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=lambda p, task=None: (_ for _ in ()).throw(RuntimeError("rate limited")),
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert result["gate_ran"] is False
+    assert result["skipped"]["video_count"] == 0
+    assert result["skipped"]["total_seconds"] == 0
+    assert result["errors"]
+
+
+def test_conflict_failure_still_allows_the_skip_report():
+    """Only a failed GATE invalidates the skip report; a failed conflict check does not."""
+    def generate_fn(prompt, task=None):
+        if "CONTRADICT" in prompt.upper():
+            raise RuntimeError("rate limited")
+        return GATE_TWO_ANSWERS
+
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=generate_fn,
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert result["gate_ran"] is True
+    assert result["skipped"]["video_count"] == 2
+    assert result["errors"]
+
+
+def test_renderer_omits_the_skip_line_when_the_gate_failed():
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=lambda p, task=None: (_ for _ in ()).throw(RuntimeError("boom")),
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    out = render_clips(result)
+    assert "you can skip" not in out
+    assert "ERRORS" in out

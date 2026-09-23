@@ -95,11 +95,22 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
     text_by_id = {c["chunk_id"]: c["text"] for c in chunks}
     verdicts: list[dict] = []
     rejections: list[dict] = []
+    seen_ids: set[str] = set()
 
     for item in parsed.get("verdicts", []):
         chunk_id = item.get("chunk_id", "")
         verdict = item.get("verdict", "")
         span = (item.get("span") or "").strip()
+
+        # Guard 0: one verdict per chunk. A model that returns the same chunk twice with
+        # conflicting verdicts is not giving us a decision — keeping both would let the
+        # later one silently overwrite the earlier, so first wins and the rest are rejected.
+        if chunk_id in seen_ids:
+            rejections.append({
+                "reason": f"duplicate verdict for chunk_id '{chunk_id}'; kept the first",
+                "chunk_id": chunk_id,
+            })
+            continue
 
         # Guard 1: a chunk_id we never sent means the model invented a source.
         if chunk_id not in text_by_id:
@@ -131,6 +142,7 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
                 })
                 verdict = "mentions"
 
+        seen_ids.add(chunk_id)
         verdicts.append({"chunk_id": chunk_id, "verdict": verdict, "span": span})
 
     return verdicts, rejections
@@ -300,12 +312,14 @@ def find_clips(
 
     # ─── The gate: one batched call over every candidate ───────────────────────
     verdicts = []
+    gate_ran = True
     if candidates:
         try:
             raw = generate_fn(build_answer_gate_prompt(question, candidates), task="gate")
             llm_calls += 1
             verdicts, rejections = parse_answer_gate_response(raw, candidates)
         except Exception as e:
+            gate_ran = False
             errors.append(f"answer gate failed (no verdicts obtained): {e}")
 
     answering_ids = {v["chunk_id"] for v in verdicts if v["verdict"] == "answers"}
@@ -325,8 +339,10 @@ def find_clips(
             "video_id": c["video_id"],
             "video_title": c.get("video_title", ""),
             "channel": c.get("channel", ""),
-            "start_seconds": c.get("start_seconds"),
-            "end_seconds": c.get("end_seconds"),
+            # Coerced to a number: a chunk missing a timestamp would otherwise crash the
+            # renderer's format_timestamp on int(None).
+            "start_seconds": float(c.get("start_seconds") or 0.0),
+            "end_seconds": float(c.get("end_seconds") or 0.0),
             "is_estimated": bool(c.get("is_estimated")),
             "span": span_by_id.get(c["chunk_id"], ""),
             "watch_url": build_watch_url(c["video_id"], c.get("start_seconds") or 0),
@@ -347,12 +363,20 @@ def find_clips(
             # A conflict-check failure must not discard perfectly good clips.
             errors.append(f"conflict check unavailable: {e}")
 
+    # The skip report is a claim: "these videos contain nothing that answers you." If the
+    # gate never returned verdicts we have not checked, so we must not make that claim —
+    # otherwise a rate limit renders as "4h you can skip", which is worse than no answer.
+    # A failed CONFLICT check does not invalidate it; only a failed gate does.
+    skipped = (build_skip_report(all_videos, {c["video_id"] for c in clips}) if gate_ran
+               else {"video_count": 0, "total_seconds": 0, "video_ids": []})
+
     return {
         "question": question,
         "workspace_id": workspace_id,
         "provider": os.environ.get("LLM_BACKEND", "auto"),
         "clips": clips,
-        "skipped": build_skip_report(all_videos, {c["video_id"] for c in clips}),
+        "skipped": skipped,
+        "gate_ran": gate_ran,
         "llm_calls": llm_calls,
         "rejections": rejections,
         "errors": errors,
