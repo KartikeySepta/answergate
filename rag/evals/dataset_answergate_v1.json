@@ -1,0 +1,175 @@
+[
+  {
+    "question": "What are the three components of MCP?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0003",
+    "label": "answers",
+    "note": "names all three explicitly: host, client, server"
+  },
+  {
+    "question": "What are the three components of MCP?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0002",
+    "label": "mentions",
+    "note": "describes MCP's architecture but says TWO sides (clients and servers), so it does not answer 'three components'"
+  },
+  {
+    "question": "What are the three components of MCP?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0005",
+    "label": "mentions",
+    "note": "about MCP as an abstraction over APIs, never enumerates components"
+  },
+  {
+    "question": "What are the three components of MCP?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0016",
+    "label": "unrelated",
+    "note": "channel promo and course pitch"
+  },
+
+  {
+    "question": "Does MCP replace your existing APIs?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0007",
+    "label": "answers",
+    "note": "'Your APIs don't go anywhere... if somebody tells you MCP replaces your APIs, they've completely misunderstood the stack'"
+  },
+  {
+    "question": "Does MCP replace your existing APIs?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0005",
+    "label": "answers",
+    "note": "'APIs still exist. MCP just makes them model-friendly.' Second creator, same conclusion"
+  },
+  {
+    "question": "Does MCP replace your existing APIs?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0003",
+    "label": "mentions",
+    "note": "about host/client/server anatomy, not about APIs surviving"
+  },
+  {
+    "question": "Does MCP replace your existing APIs?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0016",
+    "label": "unrelated",
+    "note": "channel promo"
+  },
+
+  {
+    "question": "What fraction of publicly available MCP servers are trustworthy?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0012",
+    "label": "answers",
+    "note": "'only 13% of publicly available MCP servers meet high trust thresholds' — a specific figure"
+  },
+  {
+    "question": "What fraction of publicly available MCP servers are trustworthy?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0011",
+    "label": "mentions",
+    "note": "raises the security risk in vivid terms but gives no figure; the hard case for a careless gate"
+  },
+  {
+    "question": "What fraction of publicly available MCP servers are trustworthy?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0010",
+    "label": "mentions",
+    "note": "about server directories and local vs remote, not about trust levels"
+  },
+  {
+    "question": "What fraction of publicly available MCP servers are trustworthy?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0016",
+    "label": "unrelated",
+    "note": "channel promo"
+  },
+
+  {
+    "question": "How do I add an MCP server to Claude Desktop or Cursor?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0011",
+    "label": "answers",
+    "note": "'add a small config entry, either the command to launch a local server or the URL to the remote one'"
+  },
+  {
+    "question": "How do I add an MCP server to Claude Desktop or Cursor?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0010",
+    "label": "answers",
+    "note": "same instruction plus 'Restart and the client handles the handshake'"
+  },
+  {
+    "question": "How do I add an MCP server to Claude Desktop or Cursor?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0003",
+    "label": "mentions",
+    "note": "protocol resource types and request shapes — about MCP, but not about installing anything"
+  },
+  {
+    "question": "How do I add an MCP server to Claude Desktop or Cursor?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0016",
+    "label": "unrelated",
+    "note": "channel promo"
+  },
+
+  {
+    "question": "How much does Claude Pro cost per month?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0001",
+    "label": "unrelated",
+    "note": "CONTROL: nothing in this corpus discusses pricing. A gate that answers here is fabricating."
+  },
+  {
+    "question": "How much does Claude Pro cost per month?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0004",
+    "label": "unrelated",
+    "note": "CONTROL: tools/resources/prompts, no pricing"
+  },
+  {
+    "question": "How much does Claude Pro cost per month?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0008",
+    "label": "unrelated",
+    "note": "CONTROL: plugin history, no pricing"
+  },
+  {
+    "question": "How much does Claude Pro cost per month?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0003",
+    "label": "unrelated",
+    "note": "CONTROL: protocol internals, no pricing"
+  },
+
+  {
+    "question": "Why did ChatGPT plugins lose out to MCP?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0008",
+    "label": "answers",
+    "note": "'A plugin was proprietary... Build your server once and it works on Claude, ChatGPT, Cursor... That's why the plugin era quietly ended'"
+  },
+  {
+    "question": "Why did ChatGPT plugins lose out to MCP?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0007",
+    "label": "mentions",
+    "note": "ends by teeing up the plugin story ('a little history that explains why MCP won') without telling it"
+  },
+  {
+    "question": "Why did ChatGPT plugins lose out to MCP?",
+    "workspace_id": "map",
+    "chunk_id": "cGuyrANVi4A_c0001",
+    "label": "unrelated",
+    "note": "MCP introduction, never mentions plugins"
+  },
+  {
+    "question": "Why did ChatGPT plugins lose out to MCP?",
+    "workspace_id": "map",
+    "chunk_id": "_fzpnqt39jQ_c0016",
+    "label": "unrelated",
+    "note": "channel promo"
+  }
+]
