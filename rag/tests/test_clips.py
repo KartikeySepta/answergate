@@ -256,3 +256,260 @@ def test_malformed_pair_shape_is_discarded():
 def test_unparseable_conflict_reply_raises():
     with pytest.raises(ValueError):
         parse_conflict_response("not json", 2)
+
+
+# ─── ORCHESTRATION ────────────────────────────────────────────────────────────
+
+from retrieval.clips import find_clips
+
+# rerank_score is present because real retrieval always supplies it (reranker.py:48) and
+# because it is the PRIMARY sort key — fixtures without it would let the is_estimated
+# tie-break silently reorder results and hide a ranking bug.
+RETRIEVED = [
+    {"chunk_id": "v1_c1", "video_id": "v1", "video_title": "T1", "channel": "@A",
+     "start_seconds": 1170.0, "end_seconds": 1218.0, "is_estimated": True,
+     "rerank_score": 0.91,
+     "text": "Water retention from creatine is intramuscular, not subcutaneous."},
+    {"chunk_id": "v2_c1", "video_id": "v2", "video_title": "T2", "channel": "@B",
+     "start_seconds": 482.0, "end_seconds": 554.0, "is_estimated": False,
+     "rerank_score": 0.80,
+     "text": "Creatine makes you look puffy and bloated all over."},
+    {"chunk_id": "v3_c1", "video_id": "v3", "video_title": "T3", "channel": "@C",
+     "start_seconds": 10.0, "end_seconds": 70.0, "is_estimated": False,
+     "rerank_score": 0.42,
+     "text": "I keep my creatine tub next to the blender."},
+]
+
+ALL_VIDEOS = [
+    {"video_id": "v1", "duration_seconds": 1440},
+    {"video_id": "v2", "duration_seconds": 600},
+    {"video_id": "v3", "duration_seconds": 900},
+    {"video_id": "v4", "duration_seconds": 1200},
+]
+
+
+def _fake_generate(gate_reply, conflict_reply='{"conflicts": []}'):
+    """Returns a generate_fn that answers the gate call first, then the conflict call."""
+    calls = []
+
+    def generate_fn(prompt, task=None):
+        calls.append(task)
+        return gate_reply if len(calls) == 1 else conflict_reply
+
+    generate_fn.calls = calls
+    return generate_fn
+
+
+GATE_TWO_ANSWERS = json.dumps({"verdicts": [
+    {"chunk_id": "v1_c1", "verdict": "answers", "span": "intramuscular, not subcutaneous"},
+    {"chunk_id": "v2_c1", "verdict": "answers", "span": "puffy and bloated all over"},
+    {"chunk_id": "v3_c1", "verdict": "mentions", "span": ""},
+]})
+
+
+def _run(gate_reply, conflict_reply='{"conflicts": []}'):
+    return find_clips(
+        "does creatine cause bloating?", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=_fake_generate(gate_reply, conflict_reply),
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+
+
+def test_only_answering_chunks_become_clips():
+    result = _run(GATE_TWO_ANSWERS)
+    assert [c["chunk_id"] for c in result["clips"]] == ["v1_c1", "v2_c1"]
+
+
+def test_clips_are_ranked_from_one():
+    result = _run(GATE_TWO_ANSWERS)
+    assert [c["rank"] for c in result["clips"]] == [1, 2]
+
+
+def test_clip_carries_a_watch_url_seeking_early():
+    result = _run(GATE_TWO_ANSWERS)
+    assert result["clips"][0]["watch_url"] == "https://youtu.be/v1?t=1167"
+
+
+def test_relevance_outranks_timestamp_quality():
+    """is_estimated is a TIE-BREAK, never a primary sort.
+
+    v1_c1 has estimated timestamps but a higher rerank_score than v2_c1. It must still
+    rank first — demoting a more relevant clip because its timestamp is approximate would
+    make the tool worse at its actual job.
+    """
+    result = _run(GATE_TWO_ANSWERS)
+    assert result["clips"][0]["chunk_id"] == "v1_c1"
+    assert result["clips"][0]["is_estimated"] is True
+
+
+def test_estimated_loses_only_on_an_exact_score_tie():
+    tied = [
+        {**RETRIEVED[0], "rerank_score": 0.80},   # estimated, tied score
+        {**RETRIEVED[1], "rerank_score": 0.80},   # exact, tied score
+    ]
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": "v1_c1", "verdict": "answers", "span": "intramuscular, not subcutaneous"},
+        {"chunk_id": "v2_c1", "verdict": "answers", "span": "puffy and bloated all over"},
+    ]})
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: tied,
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert result["clips"][0]["chunk_id"] == "v2_c1", "exact timestamps win an exact tie"
+
+
+def test_mentioned_but_not_answering_video_counts_as_skipped():
+    result = _run(GATE_TWO_ANSWERS)
+    # v3 only mentions; v4 never retrieved. Both are skippable.
+    assert result["skipped"]["video_count"] == 2
+    assert sorted(result["skipped"]["video_ids"]) == ["v3", "v4"]
+    assert result["skipped"]["total_seconds"] == 2100
+
+
+def test_uses_two_llm_calls_when_there_are_multiple_clips():
+    result = _run(GATE_TWO_ANSWERS)
+    assert result["llm_calls"] == 2
+
+
+def test_skips_the_conflict_call_with_fewer_than_two_clips():
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": "v1_c1", "verdict": "answers", "span": "intramuscular, not subcutaneous"},
+        {"chunk_id": "v2_c1", "verdict": "mentions", "span": ""},
+        {"chunk_id": "v3_c1", "verdict": "unrelated", "span": ""},
+    ]})
+    result = _run(gate)
+    assert len(result["clips"]) == 1
+    assert result["llm_calls"] == 1
+
+
+def test_conflicts_are_recorded_on_both_clips():
+    result = _run(GATE_TWO_ANSWERS, '{"conflicts": [[1, 2]]}')
+    assert result["clips"][0]["conflicts_with"] == [2]
+    assert result["clips"][1]["conflicts_with"] == [1]
+
+
+def test_no_clips_when_nothing_answers():
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": c["chunk_id"], "verdict": "mentions", "span": ""} for c in RETRIEVED
+    ]})
+    result = _run(gate)
+    assert result["clips"] == []
+    assert result["skipped"]["video_count"] == 4
+
+
+def test_gate_infra_failure_is_reported_not_silently_empty():
+    def exploding_generate(prompt, task=None):
+        raise RuntimeError("all providers exhausted")
+
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=exploding_generate,
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert result["clips"] == []
+    assert result["errors"], "an infra failure must be surfaced, not look like 'nothing answers'"
+
+
+def test_conflict_failure_does_not_discard_the_clips():
+    def generate_fn(prompt, task=None):
+        if "CONTRADICT" in prompt.upper():
+            raise RuntimeError("rate limited")
+        return GATE_TWO_ANSWERS
+
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: RETRIEVED,
+        generate_fn=generate_fn,
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert len(result["clips"]) == 2
+    assert result["errors"]
+
+
+def test_respects_the_clip_cap():
+    from core.config import CLIP_MAX_RETURNED
+    many = [
+        {"chunk_id": f"v{i}_c1", "video_id": f"v{i}", "video_title": "T", "channel": "@X",
+         "start_seconds": 10.0, "end_seconds": 70.0, "is_estimated": False,
+         "rerank_score": 1.0 - (i / 100.0),
+         "text": f"answer number {i} here"}
+        for i in range(CLIP_MAX_RETURNED + 3)
+    ]
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": c["chunk_id"], "verdict": "answers", "span": c["text"]} for c in many
+    ]})
+    result = find_clips(
+        "q", "fitness",
+        retrieve_fn=lambda q, w: many,
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: ALL_VIDEOS,
+    )
+    assert len(result["clips"]) == CLIP_MAX_RETURNED
+
+
+# ─── RENDERER ─────────────────────────────────────────────────────────────────
+
+from retrieval.clips import render_clips
+
+RESULT = {
+    "question": "does creatine cause bloating?",
+    "workspace_id": "fitness",
+    "provider": "gemini",
+    "clips": [
+        {"rank": 1, "chunk_id": "v1_c1", "video_id": "v1", "video_title": "T1",
+         "channel": "@A", "start_seconds": 1170.0, "end_seconds": 1218.0,
+         "is_estimated": True, "span": "intramuscular, not subcutaneous",
+         "watch_url": "https://youtu.be/v1?t=1167", "conflicts_with": [2]},
+        {"rank": 2, "chunk_id": "v2_c1", "video_id": "v2", "video_title": "T2",
+         "channel": "@B", "start_seconds": 482.0, "end_seconds": 554.0,
+         "is_estimated": False, "span": "puffy and bloated all over",
+         "watch_url": "https://youtu.be/v2?t=479", "conflicts_with": [1]},
+    ],
+    "skipped": {"video_count": 9, "total_seconds": 13860, "video_ids": []},
+    "llm_calls": 2, "rejections": [], "errors": [],
+}
+
+
+def test_render_shows_channel_and_span():
+    out = render_clips(RESULT)
+    assert "@A" in out
+    assert "intramuscular, not subcutaneous" in out
+
+
+def test_render_shows_the_watch_url():
+    assert "https://youtu.be/v1?t=1167" in render_clips(RESULT)
+
+
+def test_render_marks_estimated_timestamps_with_a_tilde():
+    assert "~19:30" in render_clips(RESULT)
+
+
+def test_render_does_not_mark_exact_timestamps():
+    out = render_clips(RESULT)
+    assert "~8:02" not in out
+    assert "8:02" in out
+
+
+def test_render_flags_conflicts():
+    assert "CONFLICTS" in render_clips(RESULT).upper()
+
+
+def test_render_reports_time_saved():
+    out = render_clips(RESULT)
+    assert "9" in out
+    assert "3h 51m" in out
+
+
+def test_render_says_so_when_nothing_answers():
+    empty = {**RESULT, "clips": []}
+    assert "no clip" in render_clips(empty).lower()
+
+
+def test_render_surfaces_errors_distinctly_from_no_answers():
+    failed = {**RESULT, "clips": [], "errors": ["answer gate failed: boom"]}
+    out = render_clips(failed).lower()
+    assert "error" in out or "failed" in out

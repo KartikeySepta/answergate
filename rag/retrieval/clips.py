@@ -237,3 +237,169 @@ def parse_conflict_response(raw: str, clip_count: int) -> list[tuple[int, int]]:
         seen.add((min(a, b), max(a, b)))
 
     return sorted(seen)
+
+
+def _default_retrieve(question: str, workspace_id: str) -> list[dict]:
+    """Real retrieval: existing hybrid search + cross-encoder rerank, unchanged.
+
+    Imported HERE rather than at module scope so the pure functions above stay importable
+    without torch or qdrant — see this module's docstring.
+    """
+    from core.config import RERANK_KEEP_TOP, VECTOR_TOP_K
+    from retrieval.hybrid import hybrid_search
+    from retrieval.reranker import rerank
+
+    fused = hybrid_search(question, workspace_id=workspace_id, top_k=VECTOR_TOP_K)
+    return rerank(question, fused, top_k=RERANK_KEEP_TOP)
+
+
+def _default_generate(prompt: str, task: str | None = None) -> str:
+    from core.llm import generate_content
+    return generate_content(prompt, task=task)
+
+
+def _default_load_videos(workspace_id: str) -> list[dict]:
+    from core.config import WORKSPACES_DIR
+    path = Path(WORKSPACES_DIR) / workspace_id / "videos.json"
+    if not path.exists():
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def find_clips(
+    question: str,
+    workspace_id: str,
+    retrieve_fn=None,
+    generate_fn=None,
+    load_videos_fn=None,
+) -> dict:
+    """Return only the clips that ANSWER the question, plus what you can skip.
+
+    retrieve_fn / generate_fn / load_videos_fn are injectable so this is testable with no
+    network and no models — the same pattern evals/evaluate.py uses for retrieve_fn.
+
+    Cost: 2 LLM calls (gate + conflicts), or 1 when fewer than two clips survive the gate.
+
+    An infrastructure failure is recorded in `errors` and never rendered as "nothing
+    answers your question" — those two outcomes look identical to a user and must not be
+    conflated (see knowledge/claim_clusterer.py:53-108 for the same distinction).
+    """
+    from core.config import CLIP_MAX_RETURNED
+
+    retrieve_fn = retrieve_fn or _default_retrieve
+    generate_fn = generate_fn or _default_generate
+    load_videos_fn = load_videos_fn or _default_load_videos
+
+    errors: list[str] = []
+    rejections: list[dict] = []
+    llm_calls = 0
+
+    candidates = retrieve_fn(question, workspace_id)
+    all_videos = load_videos_fn(workspace_id)
+
+    # ─── The gate: one batched call over every candidate ───────────────────────
+    verdicts = []
+    if candidates:
+        try:
+            raw = generate_fn(build_answer_gate_prompt(question, candidates), task="gate")
+            llm_calls += 1
+            verdicts, rejections = parse_answer_gate_response(raw, candidates)
+        except Exception as e:
+            errors.append(f"answer gate failed (no verdicts obtained): {e}")
+
+    answering_ids = {v["chunk_id"] for v in verdicts if v["verdict"] == "answers"}
+    span_by_id = {v["chunk_id"]: v["span"] for v in verdicts}
+
+    kept = [c for c in candidates if c["chunk_id"] in answering_ids]
+    # Relevance is PRIMARY: the cross-encoder score decides the order. is_estimated is only
+    # a TIE-BREAK, so an exactly-anchored clip wins over an estimated one of equal
+    # relevance — it must never outrank a genuinely more relevant clip.
+    kept.sort(key=lambda c: (-(c.get("rerank_score") or 0.0), bool(c.get("is_estimated"))))
+    kept = kept[:CLIP_MAX_RETURNED]
+
+    clips = [
+        {
+            "rank": i,
+            "chunk_id": c["chunk_id"],
+            "video_id": c["video_id"],
+            "video_title": c.get("video_title", ""),
+            "channel": c.get("channel", ""),
+            "start_seconds": c.get("start_seconds"),
+            "end_seconds": c.get("end_seconds"),
+            "is_estimated": bool(c.get("is_estimated")),
+            "span": span_by_id.get(c["chunk_id"], ""),
+            "watch_url": build_watch_url(c["video_id"], c.get("start_seconds") or 0),
+            "conflicts_with": [],
+        }
+        for i, c in enumerate(kept, start=1)
+    ]
+
+    # ─── Conflicts: one batched call, only worth making with 2+ clips ──────────
+    if len(clips) >= 2:
+        try:
+            raw = generate_fn(build_conflict_prompt(clips), task="gate")
+            llm_calls += 1
+            for a, b in parse_conflict_response(raw, len(clips)):
+                clips[a - 1]["conflicts_with"].append(b)
+                clips[b - 1]["conflicts_with"].append(a)
+        except Exception as e:
+            # A conflict-check failure must not discard perfectly good clips.
+            errors.append(f"conflict check unavailable: {e}")
+
+    return {
+        "question": question,
+        "workspace_id": workspace_id,
+        "provider": os.environ.get("LLM_BACKEND", "auto"),
+        "clips": clips,
+        "skipped": build_skip_report(all_videos, {c["video_id"] for c in clips}),
+        "llm_calls": llm_calls,
+        "rejections": rejections,
+        "errors": errors,
+    }
+
+
+def render_clips(result: dict) -> str:
+    """Plain-text output. No rich dependency, so it works when piped or in CI."""
+    from retrieval.context import format_timestamp
+
+    lines: list[str] = []
+    clips = result["clips"]
+    skipped = result["skipped"]
+
+    if result["errors"]:
+        lines.append("ERRORS (results below may be incomplete):")
+        for err in result["errors"]:
+            lines.append(f"  ! {err}")
+        lines.append("")
+
+    if not clips:
+        lines.append(f'No clip in this workspace answers: "{result["question"]}"')
+        if not result["errors"]:
+            lines.append("The topic may be mentioned without being answered.")
+        return "\n".join(lines)
+
+    lines.append(f'{len(clips)} clip(s) answer: "{result["question"]}"')
+    lines.append("")
+
+    for c in clips:
+        mark = "~" if c["is_estimated"] else ""
+        start = format_timestamp(c["start_seconds"])
+        end = format_timestamp(c["end_seconds"])
+        lines.append(f'[{c["rank"]}] {c["channel"]} — {c["video_title"]}')
+        lines.append(f'    {mark}{start} → {mark}{end}   {c["watch_url"]}')
+        lines.append(f'    "{c["span"]}"')
+        if c["conflicts_with"]:
+            others = ", ".join(f"[{n}]" for n in c["conflicts_with"])
+            lines.append(f"    ! CONFLICTS with {others}")
+        lines.append("")
+
+    if skipped["video_count"]:
+        saved = format_duration(skipped["total_seconds"])
+        lines.append(f'{skipped["video_count"]} video(s) had no answering clip '
+                     f'— {saved} you can skip')
+
+    if result["rejections"]:
+        lines.append(f'({len(result["rejections"])} model output(s) rejected by validation)')
+
+    return "\n".join(lines)
