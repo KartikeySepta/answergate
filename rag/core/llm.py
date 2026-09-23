@@ -16,6 +16,16 @@ Backends (set LLM_BACKEND in .env):
   - "gemini,mistral"    : an explicit comma-separated fallback chain of your choosing.
 
 Only the providers whose API key is present are used. Ollama needs a running server.
+
+Per-task routing: generate_content(task=...) reads {TASK}_BACKEND first, so each task can
+sit on a different provider. Tasks in use:
+  - "extraction"   : claim extraction (the bulk of the token spend — good candidate for local)
+  - "adjudication" : claim-merge decisions
+  - "synthesis"    : cross-video relationship labels
+  - "chat"         : grounded Q&A
+  - "gate"         : the clips answer gate (retrieval/clips.py). Route it separately with
+                     GATE_BACKEND if you want extraction local and the gate on a cloud
+                     model, e.g. EXTRACTION_BACKEND=ollama GATE_BACKEND=gemini.
 """
 
 import json as _json

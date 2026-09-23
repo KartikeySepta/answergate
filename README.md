@@ -170,7 +170,87 @@ cookie-based scraping at volume.
 | macOS Keychain password prompt | `YT_COOKIES_BROWSER` set in `.env` | Remove it — cookies aren't needed for public videos |
 | `No supported JavaScript runtime` warning | Deno not installed | `brew install deno` |
 
-## What Makes This Different
+## Find the clips that *answer* you, not the ones that mention your topic
+
+```bash
+python3 cli.py clips my_research "does creatine cause bloating?"
+```
+
+```
+2 clip(s) answer: "does creatine cause bloating?"
+
+[1] @JeffNippard — Creatine: Everything You Need To Know
+    ~19:30 → ~20:18   https://youtu.be/xY7abc?t=1167
+    "water retention is intramuscular, not subcutaneous — you don't look puffier"
+    ! CONFLICTS with [2]
+
+[2] @LaylaNorton — The Truth About Creatine
+    8:02 → 9:14   https://youtu.be/qM3def?t=479
+    "most people do notice some puffiness in the first two weeks"
+    ! CONFLICTS with [1]
+
+9 video(s) had no answering clip — 3h 51m you can skip
+```
+
+Ordinary retrieval returns chunks that are *topically similar*, which is why a summarizer
+can never tell you a video is padding — it has no notion of a chunk failing to answer. An
+**answer gate** labels every retrieved chunk `answers` / `mentions` / `unrelated`, and that
+last line is only possible because of it.
+
+Two guarantees, enforced mechanically rather than requested in a prompt:
+
+- **A quote must really be in the transcript.** If the model's span isn't a verbatim
+  substring of the chunk, the clip is dropped. You never see text a source didn't say.
+- **A rate limit never looks like an empty result.** Infrastructure failures are reported
+  separately from "nothing here answers you" — conflating those two is how tools lose trust.
+
+`~` marks a timestamp estimated by word position rather than anchored to a real chapter
+marker (see `ingestion/chunker.py`), so links seek 3 seconds early on purpose.
+Cost is ~2 LLM calls per question.
+
+## Fully local — no API key, no caps
+
+Every LLM step can run on a local model through Ollama, so no transcript and no query
+leaves your machine, and there is no per-day quota:
+
+```bash
+ollama serve && ollama pull llama3.2
+LLM_BACKEND=ollama python3 cli.py clips my_research "your question"
+```
+
+Retrieval is always local (local embeddings + a local cross-encoder), so provider choice
+cannot affect it. The answer gate *is* an LLM call, so it can — measured against 24
+hand-labeled examples in `rag/evals/dataset_answergate_v1.json`:
+
+| Provider | Answer-gate accuracy | Fabricated clips |
+|---|---|---|
+| Gemini (`gemini-3.1-flash-lite`) | **92%** (22/24) | **0** |
+| Ollama (`llama3.2`, fully local) | not yet measured | — |
+
+Both Gemini errors sat on the `mentions`/`unrelated` boundary, which never produces a
+false clip. All 7 answering chunks were found and nothing was promoted to `answers`
+wrongly — including on a control question the corpus cannot answer at all.
+
+Reproduce, or measure a provider yourself:
+
+```bash
+LLM_BACKEND=gemini python3 evals/evaluate_gate.py map
+LLM_BACKEND=ollama python3 evals/evaluate_gate.py map
+```
+
+You can also split routing — keep bulk claim extraction local and send only the gate to a
+cloud model — with `EXTRACTION_BACKEND=ollama GATE_BACKEND=gemini`.
+
+## What this does not do
+
+- It does **not** evaluate whether an argument is any good. Like `scite.ai` for papers, it
+  can show you that sources conflict; it cannot tell you who is right.
+- It cannot check claims against scientific literature. The corpus is only the videos you
+  added, so its authority is capped by theirs.
+- It is **not** a better summarizer than NotebookLM. If your videos have captions and you
+  want a smooth overview, use NotebookLM — it's free and needs no setup.
+
+## Under the hood
 
 - **Every claim is evidence-backed** — hallucinated chunk_ids are discarded
 - **Every citation is verified** — grouped `[Source 1, Source 2]` all checked
