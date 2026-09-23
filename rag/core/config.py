@@ -61,6 +61,17 @@ CLAIM_EXTRACTION_BATCH_SIZE = 5
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
+# Answer gate (clips). How many clips a single question returns. This also bounds the
+# conflict-detection call: with 5 clips there are at most 10 pairs, checked in ONE batched
+# call, which keeps a question at ~2 LLM calls total. Cheap per-use is a feature, not an
+# optimization — a tool people hesitate to run is a tool they stop running.
+CLIP_MAX_RETURNED = 5
+
+# Watch links start slightly early. Chunk timestamps are partly estimated by word position
+# (see ingestion/chunker.py), so they drift. Landing a few seconds BEFORE the span means the
+# viewer hears the lead-in; landing after means they missed the answer and think it's broken.
+CLIP_LINK_LEAD_SECONDS = 3
+
 # Paths
 DATA_DIR = "data"
 RAW_DIR = "data/raw"
