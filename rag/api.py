@@ -12,15 +12,17 @@ Security notes:
   • Set ALLOWED_ORIGINS in .env to lock CORS down to your frontend origin.
 """
 
+import hashlib
 import json
 import os
 import subprocess
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -127,6 +129,11 @@ class ChatRequest(BaseModel):
     mode: Literal["grounded", "assist"] = "grounded"
 
 
+class ClipsRequest(BaseModel):
+    workspace_id: str = Field(..., min_length=1, max_length=64)
+    question: str = Field(..., min_length=1, max_length=4000)
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: dict[str, Any]
@@ -135,6 +142,13 @@ class ChatResponse(BaseModel):
     mode: str
     verified: bool          # True only in grounded mode with all citations valid
     caveat: str | None = None   # set in assist mode: answer not verified against sources
+
+
+class AddTextRequest(BaseModel):
+    text: str = Field(..., min_length=10, max_length=500000, description="Raw text content to ingest")
+    workspace_id: str = Field(..., min_length=1, max_length=64)
+    title: str = Field(default="Pasted Text", max_length=200)
+    source_name: str = Field(default="manual_input", max_length=100)
 
 
 # ─── BACKGROUND PIPELINE ──────────────────────────────────────────────────────
@@ -229,6 +243,96 @@ def _run_add_pipeline(job) -> dict[str, Any]:
 SCRAPE_TIMEOUT_SECONDS = int(os.getenv("SCRAPE_TIMEOUT_SECONDS", "3600"))
 
 get_store().register("add_video", _run_add_pipeline)
+
+
+# ─── TEXT INGESTION PIPELINE ──────────────────────────────────────────────────
+
+TEXT_PIPELINE_STEPS = ["ingest", "index", "extract_claims", "cluster", "synthesize", "report"]
+
+
+def _run_add_text_pipeline(job) -> dict[str, Any]:
+    """
+    Pipeline for raw text ingestion — skips the scrape step entirely.
+
+    Creates a temporary JSON file in the format the ingestion loader expects,
+    then runs the standard RAG pipeline from ingest onward.
+    """
+    from argparse import Namespace
+    from cli import (cmd_cluster, cmd_extract_claims, cmd_index, cmd_ingest,
+                     cmd_report, cmd_synthesize)
+
+    text = job.params["text"]
+    workspace_id = job.params["workspace_id"]
+    title = job.params.get("title", "Pasted Text")
+    source_name = job.params.get("source_name", "manual_input")
+
+    # Generate a unique video_id from the text content
+    text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
+    video_id = f"text_{text_hash}"
+
+    # Build the JSON structure the ingestion loader expects
+    doc = [{
+        "metadata": {
+            "video_id": video_id,
+            "title": title,
+            "channel": source_name,
+            "channel_url": "",
+            "upload_date": date.today().strftime("%Y%m%d"),
+            "duration_seconds": 0,
+            "view_count": 0,
+            "like_count": 0,
+            "tags": [],
+            "description": "",
+        },
+        "transcript": text,
+    }]
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w", encoding="utf-8")
+    try:
+        json.dump(doc, tmp)
+        tmp.close()
+
+        # Run pipeline steps: ingest → index → extract_claims → cluster → synthesize → report
+        ns_ingest = Namespace(raw_path=tmp.name, workspace_id=workspace_id)
+        ns = Namespace(workspace_id=workspace_id)
+
+        for name, fn, arg, optional in [
+            ("ingest", cmd_ingest, ns_ingest, False),
+            ("index", cmd_index, ns, False),
+            ("extract_claims", cmd_extract_claims, ns, False),
+            ("cluster", cmd_cluster, ns, False),
+            ("synthesize", cmd_synthesize, ns, True),
+            ("report", cmd_report, ns, False),
+        ]:
+            job.start_step(name)
+            try:
+                fn(arg)
+            except Exception as e:
+                if not optional:
+                    raise
+                job.log_line(f"WARNING: {name} skipped ({e}) — retry later, the rest is intact.")
+            job.finish_step()
+
+        ws = Path(_workspaces_dir()) / workspace_id
+        return {
+            "workspace_id": workspace_id,
+            "video_id": video_id,
+            "videos": len(_read_json(ws / "videos.json", [])),
+            "chunks": len(_read_json(ws / "chunks.json", [])),
+            "claims": len(_read_json(ws / "claims.json", [])),
+            "has_report": (ws / "report.md").exists(),
+        }
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
+        try:
+            from retrieval.vector_store import close_client_for_thread
+            close_client_for_thread()
+        except Exception:
+            pass
+
+
+get_store().register("add_text", _run_add_text_pipeline)
 
 
 # ─── ENDPOINTS ─────────────────────────────────────────────────────────────────
@@ -348,6 +452,125 @@ def add_batch(req: BatchRequest):
     }
 
 
+@app.post("/add-text", status_code=202, dependencies=[Depends(require_api_key)])
+def add_text(req: AddTextRequest):
+    """
+    Queue raw text for ingestion into a workspace. Skips the scrape step entirely.
+
+    Useful for pasting articles, notes, or any text content that isn't from YouTube.
+    Poll GET /jobs/{job_id} for status.
+    """
+    try:
+        workspace_id = validate_workspace_id(req.workspace_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    store = get_store()
+    job = store.submit(
+        kind="add_text",
+        params={
+            "text": req.text,
+            "workspace_id": workspace_id,
+            "title": req.title,
+            "source_name": req.source_name,
+        },
+        steps=TEXT_PIPELINE_STEPS,
+    )
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "workspace_id": workspace_id,
+        "queue_position": store.queue_depth(),
+        "poll": f"/jobs/{job.id}",
+    }
+
+
+ALLOWED_DOC_EXTENSIONS = {".txt", ".md", ".pdf"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@app.post("/upload-doc", status_code=202, dependencies=[Depends(require_api_key)])
+async def upload_doc(
+    file: UploadFile = File(...),
+    workspace_id: str = Form(...),
+    title: str = Form(default=""),
+    source_name: str = Form(default=""),
+):
+    """
+    Upload a .txt, .md, or .pdf file for ingestion into a workspace.
+
+    Extracts text content from the file and submits it through the same
+    text ingestion pipeline as POST /add-text. Poll GET /jobs/{job_id} for status.
+    """
+    try:
+        workspace_id = validate_workspace_id(workspace_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    # Validate file extension
+    if not file.filename:
+        raise HTTPException(400, "Filename is required")
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_DOC_EXTENSIONS:
+        raise HTTPException(
+            400, f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_DOC_EXTENSIONS))}"
+        )
+
+    # Read file content
+    content_bytes = await file.read()
+    if len(content_bytes) > MAX_UPLOAD_SIZE:
+        raise HTTPException(400, f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024*1024)} MB")
+    if len(content_bytes) == 0:
+        raise HTTPException(400, "File is empty")
+
+    # Extract text
+    if ext in (".txt", ".md"):
+        try:
+            text = content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text = content_bytes.decode("latin-1")
+            except UnicodeDecodeError:
+                raise HTTPException(400, "Could not decode file as text (UTF-8 or Latin-1)")
+    elif ext == ".pdf":
+        # Attempt basic text extraction from PDF
+        try:
+            text = content_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            raise HTTPException(400, "Could not extract text from PDF")
+        # Strip out binary noise — keep only printable content
+        text = "".join(ch for ch in text if ch.isprintable() or ch in "\n\r\t")
+
+    if not text or len(text.strip()) < 10:
+        raise HTTPException(400, "Extracted text is too short (minimum 10 characters)")
+    if len(text) > 500000:
+        text = text[:500000]
+
+    # Use filename as title if not provided
+    doc_title = title if title else Path(file.filename).stem
+    doc_source = source_name if source_name else "file_upload"
+
+    store = get_store()
+    job = store.submit(
+        kind="add_text",
+        params={
+            "text": text,
+            "workspace_id": workspace_id,
+            "title": doc_title,
+            "source_name": doc_source,
+        },
+        steps=TEXT_PIPELINE_STEPS,
+    )
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "workspace_id": workspace_id,
+        "filename": file.filename,
+        "queue_position": store.queue_depth(),
+        "poll": f"/jobs/{job.id}",
+    }
+
+
 # ─── JOB ENDPOINTS ─────────────────────────────────────────────────────────────
 
 @app.get("/jobs")
@@ -417,6 +640,24 @@ def chat(req: ChatRequest):
     )
 
 
+@app.post("/clips", dependencies=[Depends(require_api_key)])
+def clips(req: ClipsRequest):
+    """Return only the clips that ANSWER the question, plus what can be skipped.
+
+    Unlike /chat this returns no prose — the payload is the clip list, so a frontend can
+    render timestamps and embed a player at each one without parsing text.
+    """
+    _checked_workspace_dir(req.workspace_id)
+
+    try:
+        question = validate_question(req.question)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    from retrieval.clips import find_clips
+    return find_clips(question, workspace_id=req.workspace_id)
+
+
 @app.get("/report/{workspace_id}")
 def get_report(workspace_id: str):
     """Return the generated research brief as Markdown."""
@@ -477,4 +718,5 @@ def delete_workspace_endpoint(workspace_id: str):
         raise HTTPException(500, f"Vector cleanup failed, workspace not deleted: {e}")
 
     shutil.rmtree(ws)
-    return {"status": "deleted", "workspace_id": workspace_id, "vectors_removed": removed}
+    jobs_removed = get_store().remove_for_workspace(workspace_id)
+    return {"status": "deleted", "workspace_id": workspace_id, "vectors_removed": removed, "jobs_removed": jobs_removed}
