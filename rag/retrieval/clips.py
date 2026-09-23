@@ -134,3 +134,106 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
         verdicts.append({"chunk_id": chunk_id, "verdict": verdict, "span": span})
 
     return verdicts, rejections
+
+
+def build_watch_url(video_id: str, start_seconds: float, lead: int | None = None) -> str:
+    """A YouTube link that seeks a few seconds BEFORE the span.
+
+    Chunk timestamps are partly estimated by word position (ingestion/chunker.py), so they
+    drift. Landing slightly early means the viewer hears the lead-in; landing late means
+    they missed the answer and think the tool is broken. Clamped at 0 — a negative t would
+    be ignored by YouTube and silently start from the beginning.
+    """
+    from core.config import CLIP_LINK_LEAD_SECONDS
+    if lead is None:
+        lead = CLIP_LINK_LEAD_SECONDS
+    t = max(0, int(start_seconds) - lead)
+    return f"https://youtu.be/{video_id}?t={t}"
+
+
+def build_skip_report(all_videos: list[dict], answering_video_ids: set[str]) -> dict:
+    """Which videos contributed nothing, and how much runtime that is.
+
+    The honest inverse of the answer: not just "here is your answer" but "here is what you
+    can safely not watch." A missing or null duration counts as 0 rather than raising — an
+    un-scraped duration should not take down a query.
+    """
+    skipped = [v for v in all_videos if v["video_id"] not in answering_video_ids]
+    return {
+        "video_count": len(skipped),
+        "total_seconds": sum(int(v.get("duration_seconds") or 0) for v in skipped),
+        "video_ids": [v["video_id"] for v in skipped],
+    }
+
+
+def format_duration(seconds: int) -> str:
+    """13860 -> '3h 51m'. Minutes only under an hour, so short corpora don't read '0h 12m'."""
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes = remainder // 60
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m"
+
+
+def build_conflict_prompt(clips: list[dict]) -> str:
+    """Ask, in ONE call, which of these clips actually contradict each other.
+
+    Deliberately NOT knowledge/synthesizer.build_relationship_prompt: that returns a single
+    label for a whole group, so it cannot say which PAIR conflicts, and running it pairwise
+    over 5 clips would cost 10 calls instead of 1.
+
+    Clips are numbered from 1 to match what the user sees in the rendered output.
+    """
+    blocks = "\n".join(
+        f'[{i}] ({c.get("channel", "unknown")}) "{c.get("span", "")}"'
+        for i, c in enumerate(clips, start=1)
+    )
+    return f"""These numbered excerpts all answer the same question. Identify only the pairs
+that GENUINELY CONTRADICT each other — asserting incompatible things about the same
+situation.
+
+Do NOT report a pair as conflicting when they:
+- agree, or mostly agree with minor differences
+- describe different situations, populations, or timeframes (both can be true at once)
+- are simply about different aspects of the topic
+
+Return ONLY JSON, no markdown fences. Use the bracket numbers shown:
+{{"conflicts": [[1, 2]]}}
+
+If nothing genuinely contradicts, return {{"conflicts": []}}.
+
+EXCERPTS:
+{blocks}
+"""
+
+
+def parse_conflict_response(raw: str, clip_count: int) -> list[tuple[int, int]]:
+    """Validate conflict pairs against the clips we actually sent.
+
+    Every index must refer to a real clip — an invented index is discarded rather than
+    rendered, mirroring synthesizer.parse_relationship_response's valid_claim_ids check.
+    Pairs are normalized ascending and deduplicated so (2,1) and (1,2) are one conflict.
+
+    Raises ValueError on unparseable JSON — an infrastructure failure, not a verdict.
+    """
+    try:
+        parsed = json.loads(_strip_fences(raw))
+    except Exception as e:
+        raise ValueError(f"unparseable conflict reply: {e}")
+
+    seen: set[tuple[int, int]] = set()
+    for pair in parsed.get("conflicts", []):
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            continue
+        try:
+            a, b = int(pair[0]), int(pair[1])
+        except (TypeError, ValueError):
+            continue
+        if a == b:
+            continue
+        if not (1 <= a <= clip_count and 1 <= b <= clip_count):
+            continue
+        seen.add((min(a, b), max(a, b)))
+
+    return sorted(seen)
