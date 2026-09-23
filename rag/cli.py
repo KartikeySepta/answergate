@@ -329,6 +329,18 @@ def cmd_synthesize(args):
         print(f"  [{t['relationship']}] {', '.join(t['videos'])} — {t['synthesis_note']}")
 
 
+def cmd_density(args):
+    """How much of each video's runtime contains checkable claims. No question needed."""
+    from knowledge.density import compute_density_for_workspace, render_density
+
+    rows = compute_density_for_workspace(args.workspace_id)
+    if args.json:
+        import json as _json
+        print(_json.dumps(rows, indent=2))
+    else:
+        print(render_density(rows))
+
+
 def cmd_clips(args):
     """Return only the clips that ANSWER a question, not those that mention the topic."""
     from retrieval.clips import find_clips, render_clips
@@ -772,6 +784,12 @@ def build_parser():
     p_chat.add_argument("--mode", choices=["grounded", "assist"], default="grounded",
                         help="grounded = cite-only (no hallucination); assist = build/apply using video knowledge + expertise")
     p_chat.set_defaults(func=cmd_chat)
+
+    p_density = subparsers.add_parser(
+        "density", help="How much of each video actually contains checkable claims")
+    p_density.add_argument("workspace_id")
+    p_density.add_argument("--json", action="store_true", help="Emit raw JSON")
+    p_density.set_defaults(func=cmd_density)
 
     p_clips = subparsers.add_parser(
         "clips", help="Find the clips that ANSWER a question (not just mention it)")

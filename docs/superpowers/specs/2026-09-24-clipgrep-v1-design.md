@@ -85,7 +85,13 @@ not survive §1. Four user-facing capabilities:
 
 0. **Works on any video** — no captions required, no 24-hour wait. This is gap #1 and the
    sharpest demo: a URL that visibly fails in NotebookLM and succeeds here.
-1. **Density** — one URL, no question. "At least 3 minutes of this 24-minute video contain
+1. **Density** — one URL, no question. **MEASURED OUTCOME (2026-09-24): the
+   claim-bearing percentage does not discriminate.** Across 7 real videos from 6 creators
+   it ranged 87-100%, because chunks are ~180 words and nearly every chunk yields a claim,
+   so the figure tracks chunk size rather than substance. `claims_per_minute` does vary
+   (1.63-3.67) but n=7 is too small to call that signal rather than speaking pace. Shipped
+   as a diagnostic with the saturation disclosed in its own output; **not** a headline and
+   not a way to rank videos. Original rationale below, kept for the record. "At least 3 minutes of this 24-minute video contain
    checkable claims. Here they are." Zero user input, ~60 seconds to value. Honest scope:
    `SponsorBlock`'s crowdsourced highlight already serves *popular* videos better. Density's
    real edge is that it needs no crowd data and is semantic rather than

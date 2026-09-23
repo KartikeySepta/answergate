@@ -92,6 +92,7 @@ python3 knowledge/synthesizer.py --test-relationship-parser
 python3 evals/evaluate.py --test-scoring
 python3 evals/evaluate_gate.py --test-scoring   # answer-gate scoring
 python3 retrieval/clips.py --test-gate          # answer-gate guards
+python3 knowledge/density.py --test-union       # interval union (chunks overlap)
 python3 cli.py --test-dispatch
 ```
 
