@@ -1,0 +1,50 @@
+  # No `version:` key — it is obsolete in Compose v2 and only emits a warning.
+
+  services:
+    rag-api:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      container_name: youtube-rag-api
+      restart: always
+      ports:
+        - "8000:8000"
+      environment:
+        - SERVICE_TYPE=rag
+        - API_KEY=${API_KEY:-}
+        - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+        - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+        - XAI_API_KEY=${XAI_API_KEY:-}
+        - LLM_BACKEND=${LLM_BACKEND:-auto}
+        - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      volumes:
+        - ./data:/app/data
+
+    scraper-api:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      container_name: youtube-scraper-api
+      restart: always
+      ports:
+        - "8001:8001"
+      environment:
+        - SERVICE_TYPE=scraper
+        - API_KEY=${API_KEY:-}
+        # Point yt-dlp's PO-token plugin at the sidecar below, by service name.
+        - BGUTIL_POT_BASE_URL=http://pot-provider:4416
+      volumes:
+        - ./scraper_temp:/tmp
+      depends_on:
+        - pot-provider
+
+    pot-provider:
+      # Generates a fresh, video-bound PO Token per request. Without this running,
+      # yt-dlp downloads intermittently 403 even when format listing succeeds.
+      # README "Prerequisites" calls this mandatory for every scrape, so it belongs
+      # in compose rather than in a docker run line users have to remember.
+      image: brainicism/bgutil-ytdlp-pot-provider
+      container_name: bgutil-provider
+      restart: unless-stopped
+      ports:
+        - "4416:4416"

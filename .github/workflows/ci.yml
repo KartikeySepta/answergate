@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Deliberately NOT installing requirements.txt. The offline test suite
+      # imports only stdlib-backed modules (core.jobs, core.security), so pulling
+      # in torch and sentence-transformers would add ~10 minutes per run for zero
+      # additional coverage. If a future test needs a heavy dependency, that is a
+      # signal the code under test has a module-level import that should be
+      # deferred into a function body instead.
+      - name: Install test dependencies
+        run: python3 -m pip install pytest
+
+      - name: Run offline test suite
+        run: python3 -m pytest rag/tests/ -v
