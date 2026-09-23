@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask 23 minutes of video a question — clipgrep demo</title>
+<meta name="description" content="Live output from an open-source, fully-local answer gate over two real YouTube videos. Every quote is verbatim; every timestamp is clickable.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#171A1F; --paper:#F7F7F5; --rule:#DBDCD7; --dim:#6B7078;
+    --mark:#FFE24B; --alert:#B4472E;
+    --sans:"IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font:400 17px/1.55 var(--sans);
+    padding:clamp(20px,5vw,64px) clamp(18px,5vw,40px) 80px;
+  }
+  main{max-width:60rem; margin:0 auto}
+
+  /* ---- masthead ---------------------------------------------------------- */
+  .top{display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; align-items:baseline;
+       padding-bottom:.9rem; border-bottom:2px solid var(--ink)}
+  .wordmark{font-weight:600; font-size:1.05rem; letter-spacing:-.01em}
+  .corpus{font:400 .82rem/1 var(--mono); color:var(--dim); margin-left:auto}
+
+  h1{
+    font-weight:600; letter-spacing:-.025em; margin:1.9rem 0 .5rem;
+    font-size:clamp(1.85rem,5.2vw,3.1rem); line-height:1.08; max-width:34ch;
+  }
+  .stand{margin:0 0 2.4rem; max-width:56ch; color:var(--dim); font-size:1.05rem}
+
+  /* ---- question picker --------------------------------------------------- */
+  .qs{list-style:none; margin:0 0 2.6rem; padding:0; border-top:1px solid var(--rule)}
+  .qs li{border-bottom:1px solid var(--rule)}
+  .qs button{
+    all:unset; box-sizing:border-box; display:block; width:100%; cursor:pointer;
+    font:400 1.02rem/1.4 var(--sans); padding:.78rem .2rem .78rem 1.7rem;
+    position:relative; color:var(--ink);
+  }
+  .qs button::before{
+    content:""; position:absolute; left:.3rem; top:1.22rem;
+    width:.5rem; height:.5rem; background:var(--rule);
+  }
+  .qs button:hover{background:#EFEFEB}
+  .qs button:focus-visible{outline:2px solid var(--ink); outline-offset:-2px}
+  .qs [aria-current=true]{font-weight:600}
+  .qs [aria-current=true]::before{background:var(--mark)}
+
+  /* ---- runtime bar: the hero. corpus drawn to scale, answers marked. ----- */
+  .bar-wrap{margin:0 0 .5rem}
+  .bar{
+    position:relative; height:104px; background:#E4E5E0;
+    border:1px solid var(--rule); overflow:hidden;
+  }
+  .seg{position:absolute; top:0; bottom:0; border-right:2px solid var(--paper)}
+  .seg::after{content:attr(data-who); position:absolute; left:.5rem; bottom:.4rem;
+    font:400 .72rem/1 var(--sans); color:var(--dim); white-space:nowrap;
+    overflow:hidden; max-width:calc(100% - 1rem)}
+  .hit{
+    position:absolute; top:0; bottom:0; background:var(--mark);
+    min-width:3px; transform:scaleY(0); transform-origin:bottom;
+    animation:grow .42s cubic-bezier(.2,.8,.2,1) forwards;
+  }
+  @keyframes grow{to{transform:scaleY(1)}}
+  @media (prefers-reduced-motion:reduce){
+    .hit{animation:none; transform:scaleY(1)}
+  }
+  .scale{display:flex; justify-content:space-between;
+         font:400 .74rem/1 var(--mono); color:var(--dim); margin-top:.35rem}
+  .verdict{margin:1.1rem 0 1.6rem; font-size:1.18rem}
+  .verdict b{font-weight:600}
+
+  /* ---- clip list --------------------------------------------------------- */
+  .clips{list-style:none; margin:0; padding:0}
+  .clip{border-top:1px solid var(--rule); padding:1.15rem 0}
+  .clip:last-child{border-bottom:1px solid var(--rule)}
+  .meta{display:flex; flex-wrap:wrap; gap:.3rem .8rem; align-items:baseline}
+  .n{font:500 .8rem/1 var(--mono); color:var(--dim); min-width:1.6rem}
+  .who{font-weight:600}
+  .tc{font:400 .84rem/1 var(--mono); color:var(--dim); margin-left:auto;
+      font-variant-numeric:tabular-nums}
+  blockquote{
+    margin:.6rem 0 .75rem 2.4rem; max-width:52ch; font-size:1.06rem; line-height:1.5;
+  }
+  blockquote span{background:var(--mark); padding:.1em .12em; box-decoration-break:clone;
+                  -webkit-box-decoration-break:clone}
+  .row{margin-left:2.4rem; display:flex; flex-wrap:wrap; gap:.55rem .9rem; align-items:center}
+  .watch{
+    all:unset; box-sizing:border-box; cursor:pointer; font:500 .88rem/1 var(--sans);
+    border:1.5px solid var(--ink); padding:.42rem .8rem;
+  }
+  .watch:hover{background:var(--ink); color:var(--paper)}
+  .watch:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+  .clash{font-size:.88rem; color:var(--alert)}
+  .src{font:400 .88rem/1 var(--sans); color:var(--dim)}
+  .src a{color:inherit}
+
+  /* ---- refusal: a result, not an error ---------------------------------- */
+  .none{border-top:2px solid var(--ink); border-bottom:1px solid var(--rule);
+        padding:1.3rem 0}
+  .none p{margin:0 0 .55rem; max-width:54ch}
+  .none p:last-child{margin:0; color:var(--dim); font-size:.95rem}
+
+  /* ---- player ------------------------------------------------------------ */
+  .player{margin:1.6rem 0 0}
+  .frame{position:relative; padding-top:56.25%; background:var(--ink)}
+  .frame iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+  .playing{font:400 .8rem/1.5 var(--mono); color:var(--dim); margin:.5rem 0 0}
+
+  footer{margin-top:3.5rem; padding-top:1.1rem; border-top:1px solid var(--rule);
+         color:var(--dim); font-size:.9rem; max-width:60ch}
+  footer a{color:var(--ink)}
+  footer p{margin:0 0 .6rem}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <span class="wordmark">clipgrep</span>
+    <span class="corpus" id="corpus"></span>
+  </div>
+
+  <h1>Ask 23 minutes of video a question.</h1>
+  <p class="stand">
+    These are real answers from two real YouTube videos about MCP, produced by the
+    open-source answer gate in this repo. Every quote below is verbatim from the
+    transcript. Every timestamp plays. Check any of them.
+  </p>
+
+  <ul class="qs" id="qs"></ul>
+
+  <div class="bar-wrap">
+    <div class="bar" id="bar"></div>
+    <div class="scale"><span>0:00</span><span id="end"></span></div>
+  </div>
+
+  <p class="verdict" id="verdict"></p>
+  <div id="out"></div>
+  <div class="player" id="player" hidden>
+    <div class="frame"><iframe id="yt" title="Video playing at the cited timestamp"
+      allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
+      allowfullscreen></iframe></div>
+    <p class="playing" id="playing"></p>
+  </div>
+
+  <footer>
+    <p id="prov"></p>
+    <p>
+      A <span style="background:var(--mark)">highlighted</span> span is text the gate
+      copied word for word from the transcript; if it could not copy one, the clip was
+      dropped rather than shown. <span class="tc" style="margin:0">~</span> marks a
+      timestamp estimated from word position, so links start about three seconds early.
+    </p>
+    <p>
+      Quotes are short and attributed, and each link sends you to the creator's video.
+      Something here that shouldn't be? Open an issue on the repo.
+    </p>
+  </footer>
+</main>
+
+<!-- Data as a script tag, not fetch(): fetch of a sibling file fails under file://, so
+     this way the page works opened straight from disk as well as on Pages. -->
+<script src="data/data.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const D = window.CLIPGREP_DATA;
+
+if (!D) {
+  // An empty screen should say what to do, not leave someone guessing.
+  document.querySelector("main").innerHTML =
+    `<div class="top"><span class="wordmark">clipgrep</span></div>
+     <h1>No demo data yet.</h1>
+     <p class="stand">Generate it from a processed workspace:
+       <code>python3 scripts/build_demo_data.py &lt;workspace&gt;</code>.
+       That writes <code>docs/demo/data/data.js</code>, which this page reads.</p>`;
+  throw new Error("docs/demo/data/data.js is missing");
+}
+
+const fmt = s => {
+  s = Math.round(s);
+  const m = Math.floor(s / 60), sec = String(s % 60).padStart(2, "0");
+  return `${m}:${sec}`;
+};
+const dur = s => {
+  const m = Math.round(s / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+};
+
+// One continuous timeline across the corpus, so the bar is drawn to true scale.
+const total = D.videos.reduce((a, v) => a + v.duration_seconds, 0);
+let acc = 0;
+const offset = {};
+for (const v of D.videos) { offset[v.video_id] = acc; acc += v.duration_seconds; }
+
+$("corpus").textContent = `${D.videos.length} videos, ${fmt(total)}`;
+$("end").textContent = fmt(total);
+$("prov").innerHTML =
+  `Generated ${D.generated_at.slice(0, 10)} from workspace <code>${D.workspace_id}</code>. ` +
+  `Retrieval: ${D.retriever}. Regenerate with <code>python3 scripts/build_demo_data.py</code>.`;
+
+function drawBar(clips) {
+  const bar = $("bar");
+  bar.innerHTML = "";
+  // Video boundaries first, so you can see where one source ends and the next begins.
+  for (const v of D.videos) {
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    seg.style.left = (100 * offset[v.video_id] / total) + "%";
+    seg.style.width = (100 * v.duration_seconds / total) + "%";
+    seg.title = `${v.channel} — ${v.title}`;
+    seg.dataset.who = v.channel;
+    bar.appendChild(seg);
+  }
+  clips.forEach((c, i) => {
+    const hit = document.createElement("div");
+    hit.className = "hit";
+    const start = offset[c.video_id] + c.start_seconds;
+    hit.style.left = (100 * start / total) + "%";
+    hit.style.width = Math.max(0.4, 100 * (c.end_seconds - c.start_seconds) / total) + "%";
+    hit.style.animationDelay = (i * 70) + "ms";
+    bar.appendChild(hit);
+  });
+}
+
+function play(clip) {
+  const t = Math.max(0, Math.round(clip.start_seconds) - 3);
+  $("yt").src = `https://www.youtube-nocookie.com/embed/${clip.video_id}?start=${t}&rel=0&autoplay=1`;
+  $("player").hidden = false;
+  $("playing").textContent = `${clip.channel} — ${clip.video_title}, from ${fmt(t)}`;
+  $("player").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function render(r) {
+  drawBar(r.clips);
+  const out = $("out");
+  out.innerHTML = "";
+  $("player").hidden = true;
+  $("yt").src = "";
+
+  if (!r.clips.length) {
+    const saved = r.skipped.total_seconds;
+    $("verdict").innerHTML = "<b>Nothing here answers this.</b>";
+    out.innerHTML =
+      `<div class="none">
+         <p>No clip in these videos answers that question, so the gate returned none
+            instead of the nearest-sounding passage.</p>
+         <p>Both videos mention Claude. Neither states a price — ${dur(saved)} you
+            do not need to watch.</p>
+       </div>`;
+    return;
+  }
+
+  const answered = r.clips.reduce((a, c) => a + (c.end_seconds - c.start_seconds), 0);
+  $("verdict").innerHTML =
+    `<b>${fmt(answered)} of ${fmt(total)}</b> answers this` +
+    (r.skipped.video_count
+      ? ` — ${r.skipped.video_count} video${r.skipped.video_count > 1 ? "s" : ""} contributed nothing`
+      : "");
+
+  const ul = document.createElement("ul");
+  ul.className = "clips";
+  for (const c of r.clips) {
+    const est = c.is_estimated ? "~" : "";
+    const li = document.createElement("li");
+    li.className = "clip";
+    li.innerHTML =
+      `<div class="meta">
+         <span class="n">${c.rank}</span>
+         <span class="who">${c.channel}</span>
+         <span class="tc">${est}${fmt(c.start_seconds)} to ${est}${fmt(c.end_seconds)}</span>
+       </div>
+       <blockquote><span>${c.span}</span></blockquote>
+       <div class="row">
+         <button class="watch">Play from ${est}${fmt(c.start_seconds)}</button>
+         ${c.conflicts_with.length
+            ? `<span class="clash">Conflicts with ${c.conflicts_with.map(n => "#" + n).join(", ")}</span>`
+            : ""}
+         <span class="src"><a href="${c.watch_url}" target="_blank" rel="noopener">open on YouTube</a></span>
+       </div>`;
+    li.querySelector(".watch").addEventListener("click", () => play(c));
+    ul.appendChild(li);
+  }
+  out.appendChild(ul);
+}
+
+const qs = $("qs");
+D.results.forEach((r, i) => {
+  const li = document.createElement("li");
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = r.question;
+  b.addEventListener("click", () => {
+    [...qs.querySelectorAll("button")].forEach(x => x.setAttribute("aria-current", "false"));
+    b.setAttribute("aria-current", "true");
+    render(r);
+  });
+  li.appendChild(b);
+  qs.appendChild(li);
+  if (i === 0) b.setAttribute("aria-current", "true");
+});
+
+render(D.results[0]);
+</script>
+</body>
+</html>

@@ -348,7 +348,26 @@ def find_clips(
     # a TIE-BREAK, so an exactly-anchored clip wins over an estimated one of equal
     # relevance — it must never outrank a genuinely more relevant clip.
     kept.sort(key=lambda c: (-(c.get("rerank_score") or 0.0), bool(c.get("is_estimated"))))
-    kept = kept[:CLIP_MAX_RETURNED]
+
+    # Chunks OVERLAP by design (CHUNK_OVERLAP_WORDS), so one sentence lives in two chunks
+    # and the gate rightly labels both "answers" — producing two clips with the same quote
+    # at nearly the same timestamp. knowledge/claim_clusterer.py documents this exact
+    # failure mode for claims; it applies identically here.
+    #
+    # Dedupe AFTER sorting so the best-ranked survives, and BEFORE the cap so the freed
+    # slots go to genuinely different answers. We keep the first and drop the later rather
+    # than merging spans: a span may only be shown against a chunk that actually contains
+    # it, so adopting a longer span from a different chunk would break the verbatim guarantee.
+    deduped: list[dict] = []
+    kept_spans: list[str] = []
+    for c in kept:
+        span_norm = normalize_whitespace(span_by_id.get(c["chunk_id"], "")).lower()
+        if span_norm and any(span_norm in s or s in span_norm for s in kept_spans):
+            continue
+        kept_spans.append(span_norm)
+        deduped.append(c)
+
+    kept = deduped[:CLIP_MAX_RETURNED]
 
     clips = [
         {

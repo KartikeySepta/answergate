@@ -25,8 +25,10 @@ rag/data/raw/
 rag/data/qdrant_db/
 rag/data/*.json
 
-# Data / Jobs database
-data/
+# Data / Jobs database. Anchored to the repo root on purpose: a bare `data/`
+# matches ANY directory named data at any depth, which silently swallowed
+# docs/demo/data/ and shipped a demo page with no data in it.
+/data/
 
 
 # macOS

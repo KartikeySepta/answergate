@@ -605,3 +605,92 @@ def test_renderer_distinguishes_could_not_check_from_found_nothing():
     out = render_clips(not_checked).lower()
     assert "could not determine" in out
     assert "no clip in this workspace answers" not in out
+
+
+# ─── OVERLAP DEDUPE ───────────────────────────────────────────────────────────
+
+OVERLAPPING = [
+    {"chunk_id": "v1_c1", "video_id": "v1", "video_title": "T", "channel": "@A",
+     "start_seconds": 240.0, "end_seconds": 310.0, "is_estimated": True, "rerank_score": 0.90,
+     "text": "MCP is an abstraction above APIs. APIs still exist. MCP makes them friendly."},
+    {"chunk_id": "v1_c2", "video_id": "v1", "video_title": "T", "channel": "@A",
+     "start_seconds": 300.0, "end_seconds": 370.0, "is_estimated": True, "rerank_score": 0.85,
+     "text": "APIs still exist. MCP makes them friendly. Take a practical example."},
+    {"chunk_id": "v2_c1", "video_id": "v2", "video_title": "T2", "channel": "@B",
+     "start_seconds": 380.0, "end_seconds": 450.0, "is_estimated": False, "rerank_score": 0.80,
+     "text": "Your APIs don't go anywhere. An API is a point-to-point connection."},
+]
+
+
+def test_overlapping_chunks_do_not_produce_duplicate_clips():
+    """Chunks overlap by CHUNK_OVERLAP_WORDS, so one sentence lives in two of them.
+
+    Observed on real data: three of five demo questions returned the identical quote twice.
+    """
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": "v1_c1", "verdict": "answers", "span": "APIs still exist"},
+        {"chunk_id": "v1_c2", "verdict": "answers", "span": "APIs still exist"},
+        {"chunk_id": "v2_c1", "verdict": "answers", "span": "Your APIs don't go anywhere"},
+    ]})
+    result = find_clips(
+        "does MCP replace APIs?", "w",
+        retrieve_fn=lambda q, w: OVERLAPPING,
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: [{"video_id": "v1", "duration_seconds": 600},
+                                  {"video_id": "v2", "duration_seconds": 600}],
+    )
+    spans = [c["span"] for c in result["clips"]]
+    assert len(spans) == 2, spans
+    assert spans[0] == "APIs still exist"
+    assert spans[1] == "Your APIs don't go anywhere"
+
+
+def test_dedupe_keeps_the_higher_ranked_of_a_duplicate_pair():
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": "v1_c1", "verdict": "answers", "span": "APIs still exist"},
+        {"chunk_id": "v1_c2", "verdict": "answers", "span": "APIs still exist"},
+    ]})
+    result = find_clips(
+        "q", "w",
+        retrieve_fn=lambda q, w: OVERLAPPING[:2],
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: [{"video_id": "v1", "duration_seconds": 600}],
+    )
+    assert len(result["clips"]) == 1
+    assert result["clips"][0]["chunk_id"] == "v1_c1"   # rerank_score 0.90 beats 0.85
+
+
+def test_a_span_contained_in_a_kept_span_is_also_deduped():
+    """The overlap often yields one longer and one shorter quote of the same sentence."""
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": "v1_c1", "verdict": "answers", "span": "APIs still exist. MCP makes them friendly"},
+        {"chunk_id": "v1_c2", "verdict": "answers", "span": "APIs still exist"},
+    ]})
+    result = find_clips(
+        "q", "w",
+        retrieve_fn=lambda q, w: OVERLAPPING[:2],
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: [{"video_id": "v1", "duration_seconds": 600}],
+    )
+    assert len(result["clips"]) == 1
+
+
+def test_dedupe_frees_slots_for_genuinely_different_answers():
+    """Dedupe runs before the cap, so duplicates never consume the 5-clip budget."""
+    from core.config import CLIP_MAX_RETURNED
+    chunks = [{"chunk_id": f"c{i}", "video_id": f"v{i}", "video_title": "T", "channel": "@X",
+               "start_seconds": 10.0, "end_seconds": 70.0, "is_estimated": False,
+               "rerank_score": 1.0 - i / 100,
+               "text": ("same answer here" if i < 4 else f"distinct answer {i}")}
+              for i in range(CLIP_MAX_RETURNED + 4)]
+    gate = json.dumps({"verdicts": [
+        {"chunk_id": c["chunk_id"], "verdict": "answers", "span": c["text"]} for c in chunks]})
+    result = find_clips(
+        "q", "w",
+        retrieve_fn=lambda q, w: chunks,
+        generate_fn=_fake_generate(gate),
+        load_videos_fn=lambda w: [],
+    )
+    spans = [c["span"] for c in result["clips"]]
+    assert spans.count("same answer here") == 1, spans
+    assert len([s for s in spans if s.startswith("distinct")]) == 5 - 1
