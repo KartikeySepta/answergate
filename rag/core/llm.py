@@ -113,10 +113,18 @@ def _openai_compatible_once(prompt: str, url: str, api_key: str, model: str) -> 
         raise RuntimeError(f"{url} HTTP {e.code}: {msg[:200]}")
 
 
-def _ollama_once(prompt: str, model: str) -> str:
+def _ollama_once(prompt: str, model: str, expect_json: bool = False) -> str:
     url = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/api/generate"
-    body = _json.dumps({"model": model, "prompt": prompt, "stream": False,
-                        "options": {"temperature": 0}}).encode("utf-8")
+    payload = {"model": model, "prompt": prompt, "stream": False,
+               "options": {"temperature": 0}}
+    if expect_json:
+        # Constrained decoding. Without this, small models emit structurally invalid JSON
+        # often enough to lose whole requests — measured: llama3.2 broke 1-2 of 6 replies
+        # with plain syntax errors (a missing colon, not an escaping problem). `format`
+        # makes the grammar a hard constraint rather than a request in the prompt, so the
+        # failure mode disappears instead of being retried around.
+        payload["format"] = "json"
+    body = _json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
@@ -125,7 +133,8 @@ def _ollama_once(prompt: str, model: str) -> str:
         raise RuntimeError(f"Ollama not reachable ({e}). Run: ollama serve && ollama pull {model}")
 
 
-def _call_provider(provider: str, prompt: str, model: str | None = None) -> str:
+def _call_provider(provider: str, prompt: str, model: str | None = None,
+                   expect_json: bool = False) -> str:
     if provider == "gemini":
         return _gemini_once(prompt, model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODELS["gemini"])
     if provider in OPENAI_COMPATIBLE:
@@ -135,7 +144,8 @@ def _call_provider(provider: str, prompt: str, model: str | None = None) -> str:
         return _openai_compatible_once(prompt, OPENAI_COMPATIBLE[provider], key,
                                        model or env_model or DEFAULT_MODELS[provider])
     if provider == "ollama":
-        return _ollama_once(prompt, model or os.environ.get("OLLAMA_MODEL") or DEFAULT_MODELS["ollama"])
+        return _ollama_once(prompt, model or os.environ.get("OLLAMA_MODEL") or DEFAULT_MODELS["ollama"],
+                            expect_json=expect_json)
     raise ValueError(f"Unknown LLM provider: {provider}")
 
 
@@ -157,7 +167,8 @@ def _task_backend(task: str | None) -> str:
     return os.environ.get("LLM_BACKEND", "gemini").strip().lower()
 
 
-def generate_content(prompt: str, task: str | None = None, model: str | None = None) -> str:
+def generate_content(prompt: str, task: str | None = None, model: str | None = None,
+                     expect_json: bool = False) -> str:
     """
     Single entry point for LLM text generation, with PER-TASK routing.
 
@@ -185,7 +196,8 @@ def generate_content(prompt: str, task: str | None = None, model: str | None = N
             if provider in ("gemini", "mistral", "grok") and not _has_key(provider):
                 continue
             try:
-                return _call_provider(provider, prompt, per_call_model)
+                return _call_provider(provider, prompt, per_call_model,
+                                      expect_json=expect_json)
             except _RateLimit as e:
                 last_err = e
                 print(f"[llm:{task or 'default'}] {provider} rate-limited → next provider", file=sys.stderr)

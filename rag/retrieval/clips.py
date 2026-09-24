@@ -331,8 +331,13 @@ def _default_retrieve(question: str, workspace_id: str) -> list[dict]:
 
 
 def _default_generate(prompt: str, task: str | None = None) -> str:
+    """Every call this module makes expects JSON back, so ask the provider to constrain it.
+
+    Providers that support grammar-constrained decoding (Ollama) then cannot emit invalid
+    JSON at all. Providers that ignore the flag are unaffected.
+    """
     from core.llm import generate_content
-    return generate_content(prompt, task=task)
+    return generate_content(prompt, task=task, expect_json=True)
 
 
 def _default_load_videos(workspace_id: str) -> list[dict]:
