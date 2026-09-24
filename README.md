@@ -150,7 +150,7 @@ docker ps   # bgutil-provider should be in the list
 ```bash
 # 1. Clone
 git clone git@github.com:KartikeySepta/answergate.git
-cd YouTube-ai-workspace
+cd answergate
 
 # 2. Setup
 python3 -m venv .venv && source .venv/bin/activate
