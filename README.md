@@ -1,4 +1,4 @@
-# YouTube AI Workspace
+# answergate
 
 **An open-source, fully-local alternative to NotebookLM for YouTube research.** Turn a pile
 of videos into cited, timestamped answers — running entirely on your own machine.
@@ -18,7 +18,7 @@ right. It reads videos NotebookLM can't, on hardware you own, without limits.
 
 ## Find the clips that *answer* you, not the ones that mention your topic
 
-**[See it running, no install](https://KartikeySepta.github.io/YouTube-ai-workspace/demo/)** — real
+**[See it running, no install](https://KartikeySepta.github.io/answergate/demo/)** — real
 output over two real videos, with every timestamp playable. Including a question the corpus
 cannot answer, where it returns nothing rather than the nearest-sounding passage.
 
@@ -149,7 +149,7 @@ docker ps   # bgutil-provider should be in the list
 
 ```bash
 # 1. Clone
-git clone git@github.com:KartikeySepta/YouTube-ai-workspace.git
+git clone git@github.com:KartikeySepta/answergate.git
 cd YouTube-ai-workspace
 
 # 2. Setup

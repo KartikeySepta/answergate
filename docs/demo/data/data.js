@@ -1,4 +1,4 @@
-window.CLIPGREP_DATA = {
+window.ANSWERGATE_DATA = {
   "generated_at": "2026-09-23T20:54:19+00:00",
   "workspace_id": "map",
   "retriever": "lexical fallback (sentence-transformers/rank_bm25 unavailable)",

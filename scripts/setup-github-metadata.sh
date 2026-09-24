@@ -55,11 +55,18 @@ echo
 echo "Done. Verify:"
 echo "  gh repo view --json description,repositoryTopics"
 echo
-echo "Two things gh cannot do — set them in the web UI:"
-echo "  1. Social preview image (Settings -> General -> Social preview)."
-echo "     1280x640 PNG. This is what renders when the repo is shared on"
-echo "     X, Slack, or LinkedIn; without it those links show a generic"
-echo "     avatar card and lose most of their click-through."
-echo "     Best content: a screenshot of real 'cli.py clips' output."
-echo "  2. Rename the repo, if you go with a name that describes the output"
-echo "     (e.g. clipgrep). Check availability on GitHub and PyPI first."
+echo "Next, the rename. Every link in the README and demo already points at"
+echo "the new name, so they stay broken until you run this:"
+echo
+echo "    gh repo rename answergate"
+echo
+echo "GitHub keeps redirects from the old URL, so nothing you have already"
+echo "shared will break."
+echo
+echo "Then two things gh cannot do — set them in the web UI:"
+echo "  1. Social preview: Settings -> General -> Social preview."
+echo "     Upload docs/demo/social-card.png (already rendered, 1280x640)."
+echo "     Without it, shares show a generic avatar card and lose most of"
+echo "     their click-through."
+echo "  2. Pages: Settings -> Pages -> deploy from branch main, folder /docs."
+echo "     That publishes the demo the README links to."

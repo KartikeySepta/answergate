@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ask 23 minutes of video a question — clipgrep demo</title>
+<title>Ask 23 minutes of video a question — answergate demo</title>
 <meta name="description" content="Live output from an open-source, fully-local answer gate over two real YouTube videos. Every quote is verbatim; every timestamp is clickable.">
-<link rel="canonical" href="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/">
+<link rel="canonical" href="https://KartikeySepta.github.io/answergate/demo/">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/">
+<meta property="og:url" content="https://KartikeySepta.github.io/answergate/demo/">
 <meta property="og:title" content="Ask 23 minutes of video a question">
 <meta property="og:description" content="Real output from an open-source, fully-local answer gate. Every quote verbatim, every timestamp playable — including a question it refuses to answer.">
-<meta property="og:image" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/social-card.png">
+<meta property="og:image" content="https://KartikeySepta.github.io/answergate/demo/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Ask 23 minutes of video a question">
 <meta name="twitter:description" content="An answer gate that returns the seconds that answer you — or nothing, when nothing does.">
-<meta name="twitter:image" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/social-card.png">
+<meta name="twitter:image" content="https://KartikeySepta.github.io/answergate/demo/social-card.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -134,9 +134,9 @@
 <body>
 <main>
   <div class="top">
-    <span class="wordmark">clipgrep</span>
+    <span class="wordmark">answergate</span>
     <span class="corpus" id="corpus"></span>
-    <a class="repo" href="https://github.com/KartikeySepta/YouTube-ai-workspace">Source on GitHub</a>
+    <a class="repo" href="https://github.com/KartikeySepta/answergate">Source on GitHub</a>
   </div>
 
   <h1>Ask 23 minutes of video a question.</h1>
@@ -164,7 +164,7 @@
 
   <footer>
     <p id="prov"></p>
-    <p><a href="https://github.com/KartikeySepta/YouTube-ai-workspace">Run this on your own videos</a> — MIT licensed, and it works fully offline on a local model.</p>
+    <p><a href="https://github.com/KartikeySepta/answergate">Run this on your own videos</a> — MIT licensed, and it works fully offline on a local model.</p>
     <p>
       A <span style="background:var(--mark)">highlighted</span> span is text the gate
       copied word for word from the transcript; if it could not copy one, the clip was
@@ -173,7 +173,7 @@
     </p>
     <p>
       Quotes are short and attributed, and each link sends you to the creator's video.
-      Something here that shouldn't be? <a href="https://github.com/KartikeySepta/YouTube-ai-workspace/issues">Open an issue</a>.
+      Something here that shouldn't be? <a href="https://github.com/KartikeySepta/answergate/issues">Open an issue</a>.
     </p>
   </footer>
 </main>
@@ -183,12 +183,12 @@
 <script src="data/data.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const D = window.CLIPGREP_DATA;
+const D = window.ANSWERGATE_DATA;
 
 if (!D) {
   // An empty screen should say what to do, not leave someone guessing.
   document.querySelector("main").innerHTML =
-    `<div class="top"><span class="wordmark">clipgrep</span></div>
+    `<div class="top"><span class="wordmark">answergate</span></div>
      <h1>No demo data yet.</h1>
      <p class="stand">Generate it from a processed workspace:
        <code>python3 scripts/build_demo_data.py &lt;workspace&gt;</code>.

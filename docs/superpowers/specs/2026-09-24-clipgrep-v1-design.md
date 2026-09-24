@@ -3,6 +3,10 @@
 **Date:** 2026-09-24
 **Status:** proposed, awaiting review
 **Supersedes:** the generic "YouTube AI Workspace" framing in `README.md`
+**Name:** shipped as **answergate**. Drafted as "clipgrep"; changed because
+`antiboredom/videogrep` is an established tool whose tagline is "like grep, but for
+video", so clipgrep read as derivative of a different product. Filenames keep the
+old slug so commit-message references still resolve.
 
 ---
 

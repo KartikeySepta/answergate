@@ -117,7 +117,7 @@ def main() -> int:
     # data as a script tag means the demo works when opened straight from disk as well as
     # on Pages — no server, no CORS, no "why is it blank".
     js = OUT.with_name("data.js")
-    js.write_text("window.CLIPGREP_DATA = " + json.dumps(payload, indent=2) + ";\n")
+    js.write_text("window.ANSWERGATE_DATA = " + json.dumps(payload, indent=2) + ";\n")
 
     print(f"\nwrote {OUT.relative_to(ROOT)}")
     print(f"wrote {js.relative_to(ROOT)}")
