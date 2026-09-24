@@ -75,6 +75,9 @@ def run(workspace_id: str) -> dict:
         by_question.setdefault(row["question"], []).append(row)
 
     verdict_by_key: dict = {}
+    unusable = 0          # replies we could not parse at all
+    rejected_total = 0    # individual verdicts thrown out by validation
+
     for question, rows in by_question.items():
         missing_ids = [r["chunk_id"] for r in rows if r["chunk_id"] not in chunk_by_id]
         if missing_ids:
@@ -82,14 +85,33 @@ def run(workspace_id: str) -> dict:
                 f"dataset references chunk_ids absent from workspace '{workspace_id}': "
                 f"{missing_ids}")
         chunks = [chunk_by_id[r["chunk_id"]] for r in rows]
-        raw = generate_content(build_answer_gate_prompt(question, chunks), task="gate")
-        verdicts, rejections = parse_answer_gate_response(raw, chunks)
+
+        # A model that emits unparseable output is FAILING, not erroring — that is a real
+        # property of the provider and exactly what this harness exists to measure. Crashing
+        # here would let the worst providers avoid producing a number at all.
+        try:
+            raw = generate_content(build_answer_gate_prompt(question, chunks), task="gate")
+            verdicts, rejections = parse_answer_gate_response(raw, chunks)
+        except ValueError as e:
+            unusable += 1
+            print(f"  [{question[:44]}] UNPARSEABLE reply — {e}")
+            continue
+        except Exception as e:
+            unusable += 1
+            print(f"  [{question[:44]}] provider error — {e}")
+            continue
+
         for v in verdicts:
             verdict_by_key[(question, v["chunk_id"])] = v["verdict"]
         if rejections:
-            print(f"  [{question[:40]}...] {len(rejections)} rejected by validation")
+            rejected_total += len(rejections)
+            print(f"  [{question[:44]}] {len(rejections)} verdict(s) rejected by validation")
 
-    return score_gate(dataset, verdict_by_key)
+    result = score_gate(dataset, verdict_by_key)
+    result["unusable_replies"] = unusable
+    result["question_groups"] = len(by_question)
+    result["rejected_verdicts"] = rejected_total
+    return result
 
 
 if __name__ == "__main__":
@@ -106,6 +128,9 @@ if __name__ == "__main__":
     result = run(workspace)
     print(f"\nprovider (LLM_BACKEND): {os.environ.get('LLM_BACKEND', 'auto')}")
     print(f"accuracy: {result['correct']}/{result['total']} = {result['accuracy']:.0%}")
+    print(f"unusable replies: {result['unusable_replies']}/{result['question_groups']} "
+          f"question groups (output could not be parsed at all)")
+    print(f"rejected verdicts: {result['rejected_verdicts']} (failed validation)")
     print(f"missing predictions: {result['missing']}")
     print("\nconfusion (actual -> predicted):")
     for (actual, predicted), n in sorted(result["confusion"].items()):

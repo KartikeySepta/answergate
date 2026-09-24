@@ -37,11 +37,32 @@ def normalize_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
+def sentences_of(chunk: dict) -> list[str]:
+    """The chunk's sentences, 0-indexed here and presented 1-indexed to the model.
+
+    Reuses ingestion/chunker.py's splitter so the numbering the model sees matches the
+    numbering we resolve against — two different splitters would silently misalign.
+    """
+    from ingestion.chunker import split_into_sentences
+    return split_into_sentences(chunk["text"])
+
+
 def build_answer_gate_prompt(question: str, chunks: list[dict]) -> str:
-    """One prompt covering EVERY candidate chunk — one call, not one per chunk."""
-    blocks = "\n\n".join(
-        f'[chunk_id: {c["chunk_id"]}]\n"{c["text"]}"' for c in chunks
-    )
+    """One prompt covering EVERY candidate chunk — one call, not one per chunk.
+
+    Sentences are numbered because the model returns an INDEX, not text. Asking a model to
+    copy transcript text into a JSON string means asking it to escape whatever punctuation
+    the speaker used; transcripts are full of quote characters, and smaller models get that
+    wrong often enough to break the whole reply. Pointing at a sentence removes the problem
+    rather than mitigating it.
+    """
+    blocks = []
+    for c in chunks:
+        numbered = "\n".join(f"  ({i}) {s}"
+                             for i, s in enumerate(sentences_of(c), start=1))
+        blocks.append(f'[chunk_id: {c["chunk_id"]}]\n{numbered}')
+    body = "\n\n".join(blocks)
+
     return f"""You decide, for each excerpt below, whether it ANSWERS a specific question
 or merely MENTIONS the topic. This distinction is the entire point — be strict.
 
@@ -52,18 +73,18 @@ Label each excerpt with exactly one verdict:
 - "mentions"  — the excerpt is about the topic but does not answer the question
 - "unrelated" — the excerpt is not about the question's topic at all
 
-For "answers" ONLY, also return "span": the shortest run of text COPIED WORD FOR WORD
-from that excerpt that does the answering. Do not paraphrase, do not correct, do not
-summarize. If you cannot copy an exact span, the verdict is "mentions", not "answers".
-For "mentions" and "unrelated", use an empty span.
+For "answers" ONLY, also return "sentence": the NUMBER of the single sentence that does
+the answering, exactly as shown in brackets. Do not retype the sentence. Do not invent a
+number. If no single sentence answers the question, the verdict is "mentions".
+Omit "sentence" for "mentions" and "unrelated".
 
 Return ONLY JSON, no markdown fences:
-{{"verdicts": [{{"chunk_id": "...", "verdict": "...", "span": "..."}}]}}
+{{"verdicts": [{{"chunk_id": "...", "verdict": "...", "sentence": 1}}]}}
 
 Use only the chunk_id values given below. Include every excerpt exactly once.
 
 EXCERPTS:
-{blocks}
+{body}
 """
 
 
@@ -102,6 +123,7 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
     parsed = _load_json_or_raise(raw, "answer-gate")
 
     text_by_id = {c["chunk_id"]: c["text"] for c in chunks}
+    chunk_sentences = {c["chunk_id"]: sentences_of(c) for c in chunks}
     verdicts: list[dict] = []
     rejections: list[dict] = []
     seen_ids: set[str] = set()
@@ -136,11 +158,36 @@ def parse_answer_gate_response(raw: str, chunks: list[dict]) -> tuple[list[dict]
             })
             continue
 
-        # Guard 2: an "answers" claim must quote the chunk, not paraphrase it.
+        # Guard 2: an "answers" verdict must point at real text in THIS chunk.
+        #
+        # Preferred path: the model returns a sentence number and we slice the text out
+        # ourselves, so the displayed span is verbatim by construction — the model never
+        # supplies text and therefore can never corrupt or invent it.
+        #
+        # Fallback: a model that ignores the format and sends a span anyway is still
+        # accepted if that span really is in the chunk, so stronger models are not punished
+        # for over-delivering. Defense in depth, not the primary contract.
         if verdict == "answers":
-            if not span:
+            index = item.get("sentence")
+            if index is not None:
+                sents = chunk_sentences[chunk_id]
+                try:
+                    i = int(index)
+                except (TypeError, ValueError):
+                    i = 0
+                if 1 <= i <= len(sents):
+                    span = sents[i - 1]          # authoritative: OUR text, not the model's
+                else:
+                    rejections.append({
+                        "reason": f"sentence {index!r} out of range 1..{len(sents)}; "
+                                  "downgraded to 'mentions'",
+                        "chunk_id": chunk_id,
+                    })
+                    verdict = "mentions"
+            elif not span:
                 rejections.append({
-                    "reason": "verdict 'answers' with an empty span; downgraded to 'mentions'",
+                    "reason": "verdict 'answers' with no sentence and no span; "
+                              "downgraded to 'mentions'",
                     "chunk_id": chunk_id,
                 })
                 verdict = "mentions"

@@ -694,3 +694,90 @@ def test_dedupe_frees_slots_for_genuinely_different_answers():
     spans = [c["span"] for c in result["clips"]]
     assert spans.count("same answer here") == 1, spans
     assert len([s for s in spans if s.startswith("distinct")]) == 5 - 1
+
+
+# ─── SENTENCE-INDEX CONTRACT ──────────────────────────────────────────────────
+# Root cause of llama3.2's unparseable replies: the gate asked the model to reproduce
+# transcript text inside a JSON string, and transcripts are full of quote characters.
+# The model now returns a sentence INDEX and we slice the text ourselves, so escaping
+# cannot go wrong and the span is verbatim by construction rather than by validation.
+
+SENT_CHUNKS = [
+    {"chunk_id": "c1", "video_id": "v1", "channel": "@A",
+     "text": 'APIs still exist. He said "MCP just wraps them" on stage. Nothing is replaced.'},
+]
+
+
+def _sent_reply(items):
+    return json.dumps({"verdicts": items})
+
+
+def test_prompt_numbers_each_sentence():
+    prompt = build_answer_gate_prompt("does MCP replace APIs?", SENT_CHUNKS)
+    assert "(1)" in prompt and "(2)" in prompt and "(3)" in prompt
+
+
+def test_sentence_index_resolves_to_text_from_the_chunk():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": 1}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert rejections == []
+    assert verdicts[0]["verdict"] == "answers"
+    assert verdicts[0]["span"] == "APIs still exist."
+
+
+def test_span_is_taken_from_the_chunk_even_when_the_model_also_sends_one():
+    """The model must never be the source of displayed text."""
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": 1,
+                        "span": "TEXT THE SOURCE NEVER SAID"}])
+    verdicts, _ = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["span"] == "APIs still exist."
+
+
+def test_a_sentence_containing_quotes_survives_intact():
+    """This is the whole point: quote chars no longer have to cross the JSON boundary."""
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": 2}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert rejections == []
+    assert verdicts[0]["span"] == 'He said "MCP just wraps them" on stage.'
+
+
+def test_out_of_range_sentence_index_is_downgraded():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": 99}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["verdict"] == "mentions"
+    assert rejections
+
+
+def test_zero_sentence_index_is_downgraded_because_numbering_starts_at_one():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": 0}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["verdict"] == "mentions"
+
+
+def test_non_integer_sentence_is_downgraded_not_crashed():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "sentence": "two"}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["verdict"] == "mentions"
+    assert rejections
+
+
+def test_model_that_ignores_the_format_and_sends_a_verbatim_span_still_works():
+    """Defense in depth: a stronger model quoting correctly should not be punished."""
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "span": "APIs still exist"}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["verdict"] == "answers"
+    assert rejections == []
+
+
+def test_span_fallback_still_rejects_text_not_in_the_chunk():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "answers", "span": "totally invented"}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert verdicts[0]["verdict"] == "mentions"
+    assert rejections
+
+
+def test_mentions_needs_no_sentence():
+    raw = _sent_reply([{"chunk_id": "c1", "verdict": "mentions"}])
+    verdicts, rejections = parse_answer_gate_response(raw, SENT_CHUNKS)
+    assert rejections == []
+    assert verdicts[0]["verdict"] == "mentions"

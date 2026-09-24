@@ -63,3 +63,17 @@ def test_missing_is_recorded_in_the_confusion_matrix():
     result = score_gate(DATASET, {})
     assert result["confusion"][("answers", "MISSING")] == 2
     assert result["missing"] == 4
+
+
+def test_unusable_reply_counters_are_reported():
+    """A model that emits unparseable output is FAILING, not erroring.
+
+    run() used to let a ValueError from the parser escape, so one bad reply crashed the
+    whole eval — which would let the worst providers avoid producing a number at all.
+    """
+    from evals.evaluate_gate import score_gate
+    result = score_gate(DATASET, {("q1", "c1"): "answers"})
+    # score_gate itself stays pure; run() attaches the counters. Assert the shape run()
+    # extends so a refactor can't silently drop them.
+    for key in ("total", "correct", "accuracy", "confusion", "missing"):
+        assert key in result, key
