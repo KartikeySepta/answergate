@@ -247,7 +247,7 @@ cookie-based scraping at volume.
 Two modules, one shared `.env`:
 
 ```
-YouTube-ai-workspace/
+answergate/
 ├── scraper/              # TRANSCRIPTION — extract audio + metadata + transcript
 │   ├── youtube.py        #   Main CLI: URL → audio → transcript → JSON
 │   ├── api.py            #   FastAPI wrapper for the scraper
