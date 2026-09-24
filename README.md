@@ -1,27 +1,13 @@
 # answergate
 
+[![CI](https://github.com/KartikeySepta/answergate/actions/workflows/ci.yml/badge.svg)](https://github.com/KartikeySepta/answergate/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Answer-gate accuracy](https://img.shields.io/badge/answer--gate-92%25%20%7C%200%20fabricated-brightgreen)](#fully-local--no-api-key-no-caps)
+
 **An open-source, fully-local alternative to NotebookLM for YouTube research.** Turn a pile
 of videos into cited, timestamped answers — running entirely on your own machine.
-
-|  | NotebookLM | This |
-|---|---|---|
-| Videos without captions | ✗ can't ingest them | ✓ transcribes the audio itself |
-| Videos newer than 24h | ✗ must wait | ✓ works immediately |
-| Where your data goes | Google | ✓ your machine (Ollama, no API key) |
-| Source limit | 50 free / 100 Plus | ✓ none |
-| Query limit | invisible daily + weekly caps | ✓ none |
-| Automatable | ✗ web UI only | ✓ CLI + REST API |
-
-It is **not** a better summarizer than NotebookLM, and it will not tell you which source is
-right. It reads videos NotebookLM can't, on hardware you own, without limits.
-
-
-## Find the clips that *answer* you, not the ones that mention your topic
 
 **[See it running, no install](https://KartikeySepta.github.io/answergate/demo/)** — real
 output over two real videos, with every timestamp playable. Including a question the corpus
 cannot answer, where it returns nothing rather than the nearest-sounding passage.
-
 
 ```bash
 python3 cli.py clips my_research "does creatine cause bloating?"
@@ -42,6 +28,19 @@ python3 cli.py clips my_research "does creatine cause bloating?"
 
 9 video(s) had no answering clip — 3h 51m you can skip
 ```
+
+## Why not just use NotebookLM?
+
+|  | NotebookLM | This |
+|---|---|---|
+| Videos without captions | ✗ can't ingest them | ✓ transcribes the audio itself |
+| Videos newer than 24h | ✗ must wait | ✓ works immediately |
+| Where your data goes | Google | ✓ your machine (Ollama, no API key) |
+| Source limit | 50 free / 100 Plus | ✓ none |
+| Query limit | invisible daily + weekly caps | ✓ none |
+| Automatable | ✗ web UI only | ✓ CLI + REST API |
+It is **not** a better summarizer than NotebookLM, and it will not tell you which source is
+right. It reads videos NotebookLM can't, on hardware you own, without limits.
 
 Ordinary retrieval returns chunks that are *topically similar*, which is why a summarizer
 can never tell you a video is padding — it has no notion of a chunk failing to answer. An
@@ -105,19 +104,6 @@ opinion. **Measured caveat:** the claim-bearing *percentage* saturates — acros
 videos from 6 creators it sat at 87-100%, because chunks are ~180 words and nearly every
 chunk yields a claim, so it tracks chunk size rather than substance. It ships as a rough
 diagnostic and says so in its own output; it is not a way to rank videos.
-
-## What this does not do
-
-- It does **not** evaluate whether an argument is any good. Like `scite.ai` for papers, it
-  can show you that sources conflict; it cannot tell you who is right.
-- It cannot check claims against scientific literature. The corpus is only the videos you
-  added, so its authority is capped by theirs.
-- It is **not** a better summarizer than NotebookLM. If your videos have captions and you
-  want a smooth overview, use NotebookLM — it's free and needs no setup.
-- It is **not** the fastest way to skip filler in one popular video. [SponsorBlock](https://github.com/ajayyy/SponsorBlock)
-  is crowdsourced, instant, and free, and its "highlight" feature jumps straight to the
-  point. This earns its keep on the long tail — videos with no crowd data and no captions —
-  and when the question is yours rather than the crowd's.
 
 ## Prerequisites
 
@@ -199,6 +185,19 @@ cd scraper && uvicorn api:app --reload --port 8001
 `POST /add` and `/transcribe` return a `job_id` immediately and run the pipeline
 in the background — frontends poll `GET /jobs/{job_id}` for progress. Long
 videos take minutes, so this is expected, not a bug.
+
+## What this does not do
+
+- It does **not** evaluate whether an argument is any good. Like `scite.ai` for papers, it
+  can show you that sources conflict; it cannot tell you who is right.
+- It cannot check claims against scientific literature. The corpus is only the videos you
+  added, so its authority is capped by theirs.
+- It is **not** a better summarizer than NotebookLM. If your videos have captions and you
+  want a smooth overview, use NotebookLM — it's free and needs no setup.
+- It is **not** the fastest way to skip filler in one popular video. [SponsorBlock](https://github.com/ajayyy/SponsorBlock)
+  is crowdsourced, instant, and free, and its "highlight" feature jumps straight to the
+  point. This earns its keep on the long tail — videos with no crowd data and no captions —
+  and when the question is yours rather than the crowd's.
 
 ## How It Works
 
