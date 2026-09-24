@@ -95,14 +95,26 @@ Retrieval is always local (local embeddings + a local cross-encoder), so provide
 cannot affect it. The answer gate *is* an LLM call, so it can — measured against 24
 hand-labeled examples in `rag/evals/dataset_answergate_v1.json`:
 
-| Provider | Answer-gate accuracy | Fabricated clips |
-|---|---|---|
-| Gemini (`gemini-3.1-flash-lite`) | **92%** (22/24) | **0** |
-| Ollama (`llama3.2`, fully local) | not yet measured | — |
+| Provider | Answers found | Fabricated clips | Unusable replies |
+|---|---|---|---|
+| Gemini `3.1-flash-lite` | **7 of 7** | **0** | 0 of 6 |
+| `qwen2.5:7b` — local | 3 of 7 | **0** | 0 of 6 |
+| `llama3.2` 3B — local | 4 of 7 | 3 | 1 of 6 |
 
-Both Gemini errors sat on the `mentions`/`unrelated` boundary, which never produces a
-false clip. All 7 answering chunks were found and nothing was promoted to `answers`
-wrongly — including on a control question the corpus cannot answer at all.
+**Local models don't lie to you. They just find less.** qwen2.5:7b fabricated nothing
+across the whole set — it declined to return a verdict for half the chunks, and a chunk
+with no verdict is never shown. llama3.2 at 3B is the one to avoid: it asserted three
+answers that were not there.
+
+Raw label accuracy (92% / 38% / 54%) is the wrong metric, so it isn't the headline. It
+scores a missing verdict as wrong, but in use a missing verdict just means that clip isn't
+displayed — the same outcome as `mentions`. What matters is whether you're shown something
+false, and how much you miss. Gemini's two errors both sat on the `mentions`/`unrelated`
+boundary, which produces no clip either way — including on a control question the corpus
+cannot answer at all.
+
+Constrained JSON decoding removed parse failures entirely: 1 of 6 replies were unusable
+before `format: json` was sent to Ollama, 0 of 6 after.
 
 Reproduce, or measure a provider yourself:
 

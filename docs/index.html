@@ -221,14 +221,19 @@ LLM_BACKEND=ollama answergate clips my_research "your question"</code></pre>
     <code>rag/evals/dataset_answergate_v1.json</code>:
   </p>
   <table>
-    <tr><th>Provider</th><th>Gate accuracy</th><th>Fabricated clips</th><th>Unusable replies</th></tr>
-    <tr><td>Gemini 3.1 Flash Lite</td><td><strong>92%</strong> (22/24)</td><td><strong>0</strong></td><td>0 of 6</td></tr>
-    <tr><td>llama3.2 (3B, local)</td><td>54% (13/24)</td><td>3</td><td>1 of 6</td></tr>
+    <tr><th>Provider</th><th>Answers found</th><th>Fabricated clips</th><th>Unusable replies</th></tr>
+    <tr><td>Gemini 3.1 Flash Lite</td><td><strong>7 of 7</strong></td><td><strong>0</strong></td><td>0 of 6</td></tr>
+    <tr><td><code>qwen2.5:7b</code> — local</td><td>3 of 7</td><td><strong>0</strong></td><td>0 of 6</td></tr>
+    <tr><td><code>llama3.2</code> 3B — local</td><td>4 of 7</td><td>3</td><td>1 of 6</td></tr>
   </table>
   <p>
-    Both Gemini errors sat on the <code>mentions</code>/<code>unrelated</code> boundary,
-    which never produces a false clip. llama3.2 is the honest counterpoint: at 3B it
-    asserted three answers that were not there. A 7B model has not been measured yet.
+    <span class="mark">Local models don't lie to you. They just find less.</span>
+    qwen2.5:7b fabricated nothing across the whole set — it declined to return a verdict for
+    half the chunks, and a chunk with no verdict is never shown. llama3.2 at 3B is the one
+    to avoid: it asserted three answers that were not there. Raw label accuracy
+    (92% / 38% / 54%) is the wrong metric and isn't the headline — it scores a missing
+    verdict as wrong, but in use that just means the clip isn't displayed. Constrained JSON
+    decoding removed parse failures entirely: 1 of 6 unusable before, 0 of 6 after.
   </p>
   <div class="note">
     <strong>What the verbatim guard does not cover.</strong> It stops invented
