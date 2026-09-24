@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>answergate — ask a question across many videos, get the clips that answer it</title>
+<meta name="description" content="Open-source, fully-local alternative to NotebookLM for YouTube. Install, usage, MCP setup, measured accuracy, and honest limitations.">
+<link rel="canonical" href="https://kartikeysepta.github.io/answergate/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kartikeysepta.github.io/answergate/">
+<meta property="og:title" content="answergate — the clips that answer your question">
+<meta property="og:description" content="Ask a question across many videos. Get timestamped clips that answer it — or nothing, when nothing does. Runs fully local.">
+<meta property="og:image" content="https://kartikeysepta.github.io/answergate/demo/social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://kartikeysepta.github.io/answergate/demo/social-card.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#171A1F; --paper:#F7F7F5; --rule:#DBDCD7; --dim:#6B7078;
+    --mark:#FFE24B; --alert:#B4472E; --code:#EFEFEB;
+    --sans:"IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0; background:var(--paper); color:var(--ink);
+       font:400 17px/1.6 var(--sans);
+       padding:clamp(20px,4vw,56px) clamp(18px,5vw,40px) 90px}
+  .wrap{max-width:54rem; margin:0 auto}
+
+  .top{display:flex; flex-wrap:wrap; gap:.6rem 1.4rem; align-items:baseline;
+       padding-bottom:.9rem; border-bottom:2px solid var(--ink); margin-bottom:2rem}
+  .wordmark{font-weight:600; font-size:1.05rem}
+  .top nav{margin-left:auto; display:flex; gap:1.1rem; flex-wrap:wrap}
+  .top nav a{font:500 .9rem/1 var(--sans); color:var(--ink); text-underline-offset:3px}
+
+  h1{font-weight:600; letter-spacing:-.025em; margin:0 0 .6rem;
+     font-size:clamp(1.9rem,5vw,2.9rem); line-height:1.1; max-width:22ch}
+  .lede{font-size:1.12rem; color:var(--dim); max-width:56ch; margin:0 0 1.6rem}
+  h2{font-size:1.32rem; font-weight:600; letter-spacing:-.015em;
+     margin:3rem 0 .9rem; padding-top:1.1rem; border-top:1px solid var(--rule)}
+  h3{font-size:1.02rem; font-weight:600; margin:1.7rem 0 .5rem}
+  p,li{max-width:62ch}
+  a{color:var(--ink)}
+
+  pre{background:var(--code); border:1px solid var(--rule); padding:.9rem 1rem;
+      overflow-x:auto; font:400 .87rem/1.55 var(--mono); margin:.8rem 0}
+  code{font:400 .89em/1 var(--mono); background:var(--code); padding:.12em .3em}
+  pre code{background:none; padding:0; font-size:1em}
+
+  table{border-collapse:collapse; width:100%; margin:1rem 0; font-size:.94rem}
+  th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--rule);
+        vertical-align:top}
+  th{font-weight:600; border-bottom:2px solid var(--ink)}
+  td code{font-size:.85em}
+
+  .cta{display:inline-block; background:var(--ink); color:var(--paper);
+       padding:.62rem 1.1rem; font-weight:500; margin:.3rem .5rem .3rem 0}
+  .cta.ghost{background:none; color:var(--ink); border:1.5px solid var(--ink)}
+  .cta:focus-visible{outline:2px solid var(--ink); outline-offset:3px}
+
+  .mark{background:var(--mark); padding:.08em .15em}
+  .note{border-left:3px solid var(--mark); padding:.1rem 0 .1rem 1rem; margin:1.2rem 0}
+  .warn{border-left:3px solid var(--alert); padding:.1rem 0 .1rem 1rem; margin:1.2rem 0}
+  .warn strong{color:var(--alert)}
+
+  footer{margin-top:3.5rem; padding-top:1.1rem; border-top:1px solid var(--rule);
+         color:var(--dim); font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <span class="wordmark">answergate</span>
+    <nav>
+      <a href="#start">Install</a>
+      <a href="#use">Use</a>
+      <a href="#mcp">MCP</a>
+      <a href="#accuracy">Accuracy</a>
+      <a href="#limits">Limits</a>
+      <a href="https://github.com/KartikeySepta/answergate">GitHub</a>
+    </nav>
+  </div>
+
+  <h1>Ask a question across many videos. Get the seconds that answer it.</h1>
+  <p class="lede">
+    Not a summary. Ranked, timestamped clips with verbatim quotes — and nothing at all
+    when nothing in your videos answers you. Runs entirely on your own machine if you
+    want it to.
+  </p>
+  <p>
+    <a class="cta" href="demo/">See real output &rarr;</a>
+    <a class="cta ghost" href="#start">Install</a>
+  </p>
+
+  <h2 id="what">What it actually does</h2>
+  <pre><code>$ answergate clips fitness "does creatine cause bloating?"
+
+2 clip(s) answer: "does creatine cause bloating?"
+
+[1] @JeffNippard — Creatine: Everything You Need To Know
+    ~19:30 → ~20:18   https://youtu.be/xY7abc?t=1167
+    "water retention is intramuscular, not subcutaneous"
+    ! CONFLICTS with [2]
+
+[2] @LaylaNorton — The Truth About Creatine
+    8:02 → 9:14   https://youtu.be/qM3def?t=479
+    "most people do notice some puffiness in the first two weeks"
+    ! CONFLICTS with [1]
+
+9 video(s) had no answering clip — 3h 51m you can skip</code></pre>
+
+  <p>
+    Ordinary retrieval returns chunks that are <em>topically similar</em>. That is why a
+    summariser can never tell you a video is padding — it has no concept of a chunk
+    <em>failing</em> to answer. An <span class="mark">answer gate</span> labels every
+    retrieved chunk <code>answers</code> / <code>mentions</code> / <code>unrelated</code>,
+    and that last line only exists because of it.
+  </p>
+
+  <h3>Two guarantees, enforced in code rather than asked for in a prompt</h3>
+  <ul>
+    <li><strong>A quote is really in the transcript.</strong> The model returns a sentence
+      <em>number</em>; the text is sliced from the chunk by the program. The model never
+      supplies displayed text, so it cannot invent or corrupt it.</li>
+    <li><strong>A rate limit never looks like an empty result.</strong> "We checked and
+      found nothing" and "we could not check" are different facts, reported differently.
+      Conflating them is how a tool teaches people not to trust it.</li>
+  </ul>
+
+  <h2 id="why">Why not just use NotebookLM?</h2>
+  <p>Mostly, you should. It is free, needs no setup, and reads YouTube fine. Four things it cannot do:</p>
+  <table>
+    <tr><th></th><th>NotebookLM</th><th>answergate</th></tr>
+    <tr><td>Videos without captions</td><td>cannot ingest them</td><td>transcribes the audio itself</td></tr>
+    <tr><td>Videos newer than 24h</td><td>must wait</td><td>works immediately</td></tr>
+    <tr><td>Where your data goes</td><td>Google</td><td>your machine, no API key needed</td></tr>
+    <tr><td>Source &amp; query limits</td><td>50 free, invisible daily caps</td><td>none</td></tr>
+    <tr><td>Automatable</td><td>web UI only</td><td>CLI, REST API, MCP</td></tr>
+  </table>
+
+  <h2 id="start">Install</h2>
+  <pre><code>pip install "answergate[full]"</code></pre>
+  <p>
+    The bare <code>pip install answergate</code> skips the ML stack, so it will not pull
+    ~2GB of torch on someone who only wants to read the CLI help. <code>[full]</code> gets
+    the working thing.
+  </p>
+
+  <h3>Three system dependencies</h3>
+  <p>These are for pulling audio out of YouTube. They are the honest cost of reading videos that have no captions.</p>
+  <table>
+    <tr><th>Needed</th><th>Why</th><th>Install</th></tr>
+    <tr><td><strong>FFmpeg</strong></td><td>yt-dlp's audio postprocessor</td><td><code>brew install ffmpeg</code></td></tr>
+    <tr><td><strong>Deno</strong></td><td>Lets yt-dlp pass YouTube's JS challenge instead of silently returning an empty format list</td><td><code>brew install deno</code></td></tr>
+    <tr><td><strong>PO token provider</strong></td><td>Fresh per-video token. Without it, downloads intermittently 403 even when listing works</td><td><code>docker compose up -d pot-provider</code></td></tr>
+  </table>
+  <div class="warn">
+    <strong>The PO token provider must be running every time you scrape.</strong> It is a
+    background service, not one-time setup. A <code>403 Forbidden</code> on download when
+    format listing worked fine means it is not up — check <code>docker ps</code>.
+  </div>
+
+  <h2 id="use">Using it</h2>
+  <pre><code># add one video — scrape, transcribe, chunk, index, extract claims
+answergate add "https://www.youtube.com/watch?v=VIDEO_ID" my_research
+
+# or many at once
+answergate batch urls.txt my_research
+
+# ask
+answergate clips my_research "your question"
+answergate clips my_research "your question" --json
+
+# how much of each video contains checkable claims
+answergate density my_research</code></pre>
+
+  <h3>Reading the output</h3>
+  <table>
+    <tr><th>You see</th><th>It means</th></tr>
+    <tr><td><code>~19:30</code></td><td>Timestamp estimated from word position, not anchored to a real chapter marker. Links seek 3s early on purpose.</td></tr>
+    <tr><td><code>! CONFLICTS with [2]</code></td><td>The two clips assert incompatible things about the same situation. It does not tell you which is right.</td></tr>
+    <tr><td><code>9 video(s) had no answering clip</code></td><td>Those were checked and contained nothing. Safe to skip.</td></tr>
+    <tr><td><code>COULD NOT DETERMINE</code></td><td>Different thing entirely: the gate did not run. Nothing was checked. Retry.</td></tr>
+  </table>
+
+  <h2 id="mcp">From Claude Code, Cursor, or any MCP client</h2>
+  <pre><code>{
+  "mcpServers": {
+    "answergate": {
+      "command": "python3",
+      "args": ["/absolute/path/to/rag/mcp_server.py"],
+      "env": { "GEMINI_API_KEY": "..." }
+    }
+  }
+}</code></pre>
+  <p>
+    Your agent gets <code>search_clips</code> and <code>list_workspaces</code>. The tool
+    description tells the agent it can come back empty — so an agent that gets
+    "no source answers this" reports that, instead of confabulating from the nearest
+    passage. Dependency-free: MCP is JSON-RPC over stdio, so there is no SDK to install.
+  </p>
+
+  <h2 id="local">Running fully local</h2>
+  <pre><code>ollama serve && ollama pull llama3.2
+LLM_BACKEND=ollama answergate clips my_research "your question"</code></pre>
+  <p>
+    No transcript and no query leaves your machine, and there is no per-day quota. You can
+    also split routing — bulk claim extraction local, only the gate on a cloud model:
+  </p>
+  <pre><code>EXTRACTION_BACKEND=ollama GATE_BACKEND=gemini answergate clips my_research "..."</code></pre>
+
+  <h2 id="accuracy">Does it actually work?</h2>
+  <p>
+    Retrieval is always local, so provider choice cannot affect it. The gate <em>is</em> an
+    LLM call, so it can. Measured against 24 hand-labelled examples in
+    <code>rag/evals/dataset_answergate_v1.json</code>:
+  </p>
+  <table>
+    <tr><th>Provider</th><th>Gate accuracy</th><th>Fabricated clips</th><th>Unusable replies</th></tr>
+    <tr><td>Gemini 3.1 Flash Lite</td><td><strong>92%</strong> (22/24)</td><td><strong>0</strong></td><td>0 of 6</td></tr>
+    <tr><td>llama3.2 (3B, local)</td><td>54% (13/24)</td><td>3</td><td>1 of 6</td></tr>
+  </table>
+  <p>
+    Both Gemini errors sat on the <code>mentions</code>/<code>unrelated</code> boundary,
+    which never produces a false clip. llama3.2 is the honest counterpoint: at 3B it
+    asserted three answers that were not there. A 7B model has not been measured yet.
+  </p>
+  <div class="note">
+    <strong>What the verbatim guard does not cover.</strong> It stops invented
+    <em>text</em>. It cannot stop wrong <em>judgment</em> — all three llama3.2 fabrications
+    quoted real sentences and simply judged them wrong.
+  </div>
+  <p>Reproduce any of this yourself:</p>
+  <pre><code>LLM_BACKEND=gemini python3 evals/evaluate_gate.py map
+LLM_BACKEND=ollama python3 evals/evaluate_gate.py map</code></pre>
+
+  <h2 id="limits">What this does not do</h2>
+  <ul>
+    <li>It does <strong>not</strong> judge whether an argument is any good. Like
+      <a href="https://scite.ai/">scite.ai</a> for papers, it can show you that sources
+      conflict; it cannot tell you who is right.</li>
+    <li>It cannot reach beyond the videos you added. Its authority is capped by theirs.</li>
+    <li>It is <strong>not</strong> a better summariser than NotebookLM.</li>
+    <li>It is <strong>not</strong> the fastest way to skip filler in one popular video —
+      <a href="https://github.com/ajayyy/SponsorBlock">SponsorBlock</a> is crowdsourced,
+      instant and free. This earns its keep on the long tail: videos with no crowd data
+      and no captions, and questions that are yours rather than the crowd's.</li>
+    <li>Claim <em>density</em> ships as a rough diagnostic, not a ranking. Measured across
+      7 real videos it sat at 87–100% for everything, because chunks are ~180 words and
+      nearly every chunk yields a claim — it tracks chunk size, not substance.</li>
+  </ul>
+
+  <h2 id="how">How it works</h2>
+  <pre><code>YouTube URL
+  → yt-dlp + Whisper/Gemini        audio, not captions
+  → chunk (~180 words, overlapping)
+  → embed + index                  local embeddings, Qdrant on disk
+  → extract claims                 evidence chunk_ids validated
+
+question
+  → hybrid retrieve (vector + BM25) + cross-encoder rerank
+  → ANSWER GATE                    1 batched call: answers/mentions/unrelated
+  → conflict check                 1 batched call over the kept clips
+  → skip report                    pure arithmetic
+  → ranked clips + timestamps</code></pre>
+  <p>
+    ~2 LLM calls per question. Cheap per use is a design goal, not an optimisation: a tool
+    you hesitate to run is a tool you stop running.
+  </p>
+
+  <footer>
+    <p>
+      MIT licensed ·
+      <a href="https://github.com/KartikeySepta/answergate">Source</a> ·
+      <a href="https://github.com/KartikeySepta/answergate/issues">Issues</a> ·
+      <a href="demo/">Live demo</a>
+    </p>
+    <p>
+      Quotes shown anywhere here are short, verbatim and attributed, and every link goes
+      to the creator's video.
+    </p>
+  </footer>
+</div>
+</body>
+</html>

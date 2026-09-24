@@ -5,7 +5,7 @@
 **An open-source, fully-local alternative to NotebookLM for YouTube research.** Turn a pile
 of videos into cited, timestamped answers — running entirely on your own machine.
 
-**[See it running, no install](https://KartikeySepta.github.io/answergate/demo/)** — real
+**[Live demo](https://kartikeysepta.github.io/answergate/demo/)** · **[Guide](https://kartikeysepta.github.io/answergate/)** — real
 output over two real videos, with every timestamp playable. Including a question the corpus
 cannot answer, where it returns nothing rather than the nearest-sounding passage.
 
