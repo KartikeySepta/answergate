@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#171A1F;--paper:#F7F7F5;--rule:#DBDCD7;--dim:#6B7078;--mark:#FFE24B}
+*{box-sizing:border-box;margin:0}
+body{width:1280px;height:640px;background:var(--paper);color:var(--ink);
+     font:400 22px/1.5 "IBM Plex Sans",sans-serif;padding:60px 70px;display:flex;
+     flex-direction:column;justify-content:space-between}
+.top{display:flex;align-items:baseline;border-bottom:3px solid var(--ink);padding-bottom:14px}
+.wm{font-weight:600;font-size:26px}
+.meta{margin-left:auto;font:400 19px/1 "IBM Plex Mono",monospace;color:var(--dim)}
+h1{font-size:62px;line-height:1.04;letter-spacing:-.03em;font-weight:600;margin:34px 0 0;max-width:20ch}
+.bar{position:relative;height:56px;background:#E4E5E0;border:1px solid var(--rule);margin:30px 0 0}
+.seg{position:absolute;top:0;bottom:0;border-right:3px solid var(--paper)}
+.hit{position:absolute;top:0;bottom:0;background:var(--mark)}
+.quote{margin:26px 0 0;font-size:27px;max-width:40ch}
+.quote span{background:var(--mark);padding:.08em .1em}
+.who{font:400 19px/1 "IBM Plex Mono",monospace;color:var(--dim);margin-top:12px}
+.foot{font-size:20px;color:var(--dim);border-top:1px solid var(--rule);padding-top:16px}
+</style></head><body>
+<div>
+  <div class="top"><span class="wm">clipgrep</span><span class="meta">2 videos, 23:20</span></div>
+  <h1>Ask 23 minutes of video a question.</h1>
+  <div class="bar">
+    <div class="seg" style="left:0;width:31.4%"></div>
+    <div class="seg" style="left:31.4%;width:68.6%"></div>
+    <div class="hit" style="left:17.5%;width:6.9%"></div>
+    <div class="hit" style="left:59%;width:5.3%"></div>
+    <div class="hit" style="left:63.2%;width:4.9%"></div>
+  </div>
+  <p class="quote">&ldquo;<span>APIs still exist. MCP just makes them model-friendly.</span>&rdquo;</p>
+  <p class="who">Google Cloud Tech &nbsp;~4:05 to ~5:41 &nbsp;&middot;&nbsp;nbsp;&nbsp;&middot;&nbsp;mdash;&nbsp;&middot;&nbsp;nbsp; verbatim, playable</p>
+</div>
+<p class="foot">Open source. Runs fully local on Ollama — no API key, no source limits.</p>
+</body></html>

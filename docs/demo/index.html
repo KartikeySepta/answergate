@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ask 23 minutes of video a question — clipgrep demo</title>
 <meta name="description" content="Live output from an open-source, fully-local answer gate over two real YouTube videos. Every quote is verbatim; every timestamp is clickable.">
+<link rel="canonical" href="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/">
+<meta property="og:title" content="Ask 23 minutes of video a question">
+<meta property="og:description" content="Real output from an open-source, fully-local answer gate. Every quote verbatim, every timestamp playable — including a question it refuses to answer.">
+<meta property="og:image" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ask 23 minutes of video a question">
+<meta name="twitter:description" content="An answer gate that returns the seconds that answer you — or nothing, when nothing does.">
+<meta name="twitter:image" content="https://KartikeySepta.github.io/YouTube-ai-workspace/demo/social-card.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,6 +39,7 @@
        padding-bottom:.9rem; border-bottom:2px solid var(--ink)}
   .wordmark{font-weight:600; font-size:1.05rem; letter-spacing:-.01em}
   .corpus{font:400 .82rem/1 var(--mono); color:var(--dim); margin-left:auto}
+  .repo{font:500 .88rem/1 var(--sans); color:var(--ink); text-underline-offset:3px}
 
   h1{
     font-weight:600; letter-spacing:-.025em; margin:1.9rem 0 .5rem;
@@ -125,6 +136,7 @@
   <div class="top">
     <span class="wordmark">clipgrep</span>
     <span class="corpus" id="corpus"></span>
+    <a class="repo" href="https://github.com/KartikeySepta/YouTube-ai-workspace">Source on GitHub</a>
   </div>
 
   <h1>Ask 23 minutes of video a question.</h1>
@@ -152,6 +164,7 @@
 
   <footer>
     <p id="prov"></p>
+    <p><a href="https://github.com/KartikeySepta/YouTube-ai-workspace">Run this on your own videos</a> — MIT licensed, and it works fully offline on a local model.</p>
     <p>
       A <span style="background:var(--mark)">highlighted</span> span is text the gate
       copied word for word from the transcript; if it could not copy one, the clip was
@@ -160,7 +173,7 @@
     </p>
     <p>
       Quotes are short and attributed, and each link sends you to the creator's video.
-      Something here that shouldn't be? Open an issue on the repo.
+      Something here that shouldn't be? <a href="https://github.com/KartikeySepta/YouTube-ai-workspace/issues">Open an issue</a>.
     </p>
   </footer>
 </main>
