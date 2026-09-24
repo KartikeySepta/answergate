@@ -155,26 +155,23 @@ docker ps   # bgutil-provider should be in the list
 ## Quick Start
 
 ```bash
-# 1. Clone
-git clone git@github.com:KartikeySepta/answergate.git
-cd answergate
+# 1. Install
+pip install "answergate[full]"        # or: pipx install "answergate[full]"
 
-# 2. Setup
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+# ...or from source, if you want to hack on it
+git clone git@github.com:KartikeySepta/answergate.git
+cd answergate && python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[full]"
 echo "GEMINI_API_KEY=your_key_here" > .env   # optional — see "Fully local" below
 
 # 3. Start the PO token provider (required for every scrape)
 docker compose up -d pot-provider
 
 # 4. Add a video (one command does everything)
-cd rag
-python3 cli.py add "https://www.youtube.com/watch?v=VIDEO_ID" my_research
+answergate add "https://www.youtube.com/watch?v=VIDEO_ID" my_research
 
-# 5. Use it
-python3 cli.py talk my_research          # Interactive cited Q&A
-python3 cli.py report my_research        # Generate research brief
-cat data/workspaces/my_research/report.md
+# 5. Ask it something
+answergate clips my_research "your question"
 ```
 
 ## Add Multiple Videos at Once

@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "answergate"
+version = "0.1.0"
+description = "Ask a question across many YouTube videos and get the exact timestamped clips that answer it — or nothing, when nothing does. Fully local option, no API key, no source limits."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Kartikey Septa" }]
+keywords = [
+    "notebooklm-alternative", "youtube", "rag", "ollama", "local-llm",
+    "transcription", "whisper", "semantic-search", "video-search", "citations",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Text Processing :: Indexing",
+]
+
+# Kept deliberately light. The heavy ML stack is an extra so `pip install answergate`
+# does not pull ~2GB of torch on someone who only wants to look at the CLI.
+dependencies = [
+    "google-genai>=0.3.0",
+    "python-dotenv>=1.0.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+# Everything needed to actually index and query a corpus.
+full = [
+    "yt-dlp>=2026.6.9",
+    "faster-whisper>=1.2.1",
+    "sentence-transformers>=3.0.0",
+    "qdrant-client>=1.9.0",
+    "rank-bm25>=0.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "rich>=13.0.0",
+]
+dev = ["pytest>=8.3.0", "httpx>=0.27.0"]
+
+[project.urls]
+Homepage = "https://github.com/KartikeySepta/answergate"
+Demo = "https://kartikeysepta.github.io/answergate/demo/"
+Issues = "https://github.com/KartikeySepta/answergate/issues"
+
+[project.scripts]
+answergate = "answergate.__main__:main"
+
+[tool.setuptools]
+# rag/ ships as the `answergate` package. Its modules still import each other as
+# top-level names (`from core.config import ...`) via the sys.path shim they already
+# use, so nothing needed rewriting to make this installable.
+#
+# The consequence, stated plainly: importing `answergate` puts its subfolders on
+# sys.path for that process. That is fine for a CLI, which owns its process. It is NOT
+# a stable library API — do not `import answergate.core` from your own application yet.
+package-dir = { answergate = "rag" }
+# Listed explicitly rather than auto-discovered: with package-dir remapping rag -> answergate,
+# `find` resolves the subfolders as top-level names (core, retrieval, ...) and produced an
+# empty wheel. Tests are excluded from the distribution on purpose.
+packages = [
+    "answergate",
+    "answergate.core",
+    "answergate.retrieval",
+    "answergate.chat",
+    "answergate.ingestion",
+    "answergate.knowledge",
+    "answergate.evals",
+]
+
+
+
+[tool.setuptools.package-data]
+answergate = ["evals/*.json"]
