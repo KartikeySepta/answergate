@@ -58,6 +58,27 @@ Two guarantees, enforced mechanically rather than requested in a prompt:
 marker (see `ingestion/chunker.py`), so links seek 3 seconds early on purpose.
 Cost is ~2 LLM calls per question.
 
+## Use it from Claude Code, Cursor, or any MCP client
+
+```json
+{
+  "mcpServers": {
+    "answergate": {
+      "command": "python3",
+      "args": ["/absolute/path/to/rag/mcp_server.py"],
+      "env": { "GEMINI_API_KEY": "..." }
+    }
+  }
+}
+```
+
+Your agent gets two tools: `search_clips` and `list_workspaces`. Ask it *"what do my
+videos say about X"* and it comes back with timestamped quotes — or with nothing, when
+nothing in the corpus answers. That refusal is the point: an agent that gets "no source
+answers this" will say so, instead of confabulating from the nearest-sounding passage.
+
+Dependency-free — MCP is JSON-RPC over stdio, so there's no SDK to install.
+
 ## Fully local — no API key, no caps
 
 Every LLM step can run on a local model through Ollama, so this is genuinely self-hosted:
